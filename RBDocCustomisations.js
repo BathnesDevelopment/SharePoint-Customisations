@@ -36,7 +36,7 @@ var multiContinueError = "";
 var runOnce = false;
 
 ////////////////////////////////////////////////////////////////////////////////////
-// Document ready
+// DOCUMENT READY
 // On document ready we override a number of function in order
 // to intercept events
 ////////////////////////////////////////////////////////////////////////////////////
@@ -96,7 +96,8 @@ $(function(){
 
 
     //////////////////////////////////////////////////
-    // Comment this.
+    // REQUEST: DISABLE drag and drop for record libraries
+	// Users have requested that drag and drop be disabled in the main record libraries.
     //////////////////////////////////////////////////
     ExecuteOrDelayUntilScriptLoaded(function() {
         if ((window.location.href.search("rbdoc/Revenues") !== -1) ||
@@ -108,6 +109,52 @@ $(function(){
         }
     }, "DragDrop.js");
 });
+
+////////////////////////////////////////////////////////////////
+// VALIDATION
+// Function: VerifyReference
+// Verifies that a reference number meets the requiremnts
+// Inputs:  reference = the reference number (as a number)
+//          type = the type of reference, as a string. See code for details
+////////////////////////////////////////////////////////////////
+function VerifyReference(reference, type) {
+    var isInt = function (n) {
+        return n % 1 === 0;
+    };
+    if (typeof reference !== "number" || !isInt(reference)){
+        console.warn(reference, "is not an integer");
+        return false;
+    }
+    switch (type) {
+        case "revs":
+            // 700XXXXX or XXXXXX
+            return (69999999 < reference && reference < 70100000 ||
+                   999999 < reference && reference < 10000000);
+        case "claim":
+            //1-7 digits
+            return 0 < reference && reference < 10000000;
+        case "nndr":
+            // 3XXXXXX
+            return 2999999 < reference && reference < 4000000;
+        case "bid":
+            // 777XXXX
+            return 7769999 < reference && reference < 778000000;
+        default: return false;
+    }
+}
+
+////////////////////////////////////////////////////////////////
+// VALIDATION
+// Function: getReferenceError
+////////////////////////////////////////////////////////////////
+function getReferenceError(type) {
+    return {
+        "revs":"Must either be 8 digits long and start with 700 or 6 digits long",
+        "claim":"Must be 1-7 digits long",
+        "nndr":"Must be 8 digits long and start with 3 or 4",
+        "bid":"Must be 7 digits long and begin with 777"
+    }[type];
+}
 
 //////////////////////////////////////////////////
 // TRIGGER MULTIPLE SELECT WORKFLOWS
@@ -157,7 +204,6 @@ function submitForm() {
             inputParameters[this.name] = input;
             submission += '<br />Field: <strong>' + this.name + '</strong> Value: <strong>' + input + '</strong><br/>';
         }
-
     });
 
     // For email we loop through the people picker people.
@@ -204,54 +250,10 @@ function confirmDialog(url) {
     waitDialog = SP.UI.ModalDialog.showModalDialog(confirmOptions);
 }
 
-////////////////////////////////////////////////////////////////
-// Function: VerifyReference
-// Verifies that a reference number meets the requiremnts
-// Inputs:  reference = the reference number (as a number)
-//          type = the type of reference, as a string. See code for details
-////////////////////////////////////////////////////////////////
-function VerifyReference(reference, type) {
-    var isInt = function (n) {
-        return n % 1 === 0;
-    };
-    if (typeof reference !== "number" || !isInt(reference)){
-        console.warn(reference, "is not an integer");
-        return false;
-    }
-    switch (type) {
-        case "revs":
-            // 700XXXXX or XXXXXX
-            return (69999999 < reference && reference < 70100000 ||
-                   999999 < reference && reference < 10000000);
-        case "claim":
-            //1-7 digits
-            return 0 < reference && reference < 10000000;
-        case "nndr":
-            // 3XXXXXX
-            return 2999999 < reference && reference < 4000000;
-        case "bid":
-            // 777XXXX
-            return 7769999 < reference && reference < 778000000;
-        default: return false;
-    }
-}
+
 
 ////////////////////////////////////////////////////////////////
-// Function: VerifyReference
-// Verifies that a reference number meets the requiremnts
-// Inputs:  reference = the reference number (as a number)
-//          type = the type of reference, as a string. See code for details
-////////////////////////////////////////////////////////////////
-function getReferenceError(type) {
-    return {
-        "revs":"Must either be 8 digits long and start with 700 or 6 digits long",
-        "claim":"Must be 1-7 digits long",
-        "nndr":"Must be 8 digits long and start with 3 or 4",
-        "bid":"Must be 7 digits long and begin with 777"
-    }[type];
-}
-
-////////////////////////////////////////////////////////////////
+// TRIGGER MULTIPLE SELECT WORKFLOWS
 // Function: ApplyMultiItemWorkflow
 // Triggered by custom actions on lists.
 // Inputs:  wfname = Actually a GUID that uses underscores
@@ -281,8 +283,7 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
                 if (WPQ2ListData.Row[rowItem].ID == selectedItemIds[i].id) {
                     items += WPQ2ListData.Row[rowItem].FileLeafRef + '<br/>';
                     if (WPQ2ListData.Row[rowItem].CheckoutUser !== "") {
-                        multiContinueError += "One or more of the selected items are checked out." +
-                        "\n please ask the user who has checked this document out to check it in before continuing.";
+                        multiContinueError += "One or more of the selected items are checked out.\n please ask the user who has checked this document out to check it in before continuing.";
                     }
                 }
             }
@@ -306,7 +307,10 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
                     for (rowItem in WPQ2ListData.Row) {
                         if (WPQ2ListData.Row[rowItem].ID == selectedItemIds[l].id){
                             if (!existingValues.Reference) {
-                                existingValues.Reference = WPQ2ListData.Row[rowItem].Reference;
+                                if (WPQ2ListData.Row[rowItem].Reference) existingValues.Reference = WPQ2ListData.Row[rowItem].Reference;
+								if (WPQ2ListData.Row[rowItem].Claim_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Claim_x0020_Ref;
+								if (WPQ2ListData.Row[rowItem].NNDR_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].NNDR_x0020_Ref;
+								if (WPQ2ListData.Row[rowItem].Account_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Account_x0020_Ref;
                             }
                             else
                             {
@@ -348,7 +352,10 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
                     for (rowItem in WPQ2ListData.Row) {
                         if (WPQ2ListData.Row[rowItem].ID == selectedItemIds[l].id){
                             if (!existingValues.Reference) {
-                                existingValues.Reference = WPQ2ListData.Row[rowItem].Reference;
+                                if (WPQ2ListData.Row[rowItem].Reference) existingValues.Reference = WPQ2ListData.Row[rowItem].Reference;
+								if (WPQ2ListData.Row[rowItem].Claim_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Claim_x0020_Ref;
+								if (WPQ2ListData.Row[rowItem].NNDR_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].NNDR_x0020_Ref;
+								if (WPQ2ListData.Row[rowItem].Account_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Account_x0020_Ref;
                             }
                             else
                             {
@@ -388,7 +395,10 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
 
                         if (WPQ2ListData.Row[rowItem].ID == selectedItemIds[l].id){
                             if (!existingValues.Reference) {
-                                existingValues.Reference = WPQ2ListData.Row[rowItem].Reference;
+                                if (WPQ2ListData.Row[rowItem].Reference) existingValues.Reference = WPQ2ListData.Row[rowItem].Reference;
+								if (WPQ2ListData.Row[rowItem].Claim_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Claim_x0020_Ref;
+								if (WPQ2ListData.Row[rowItem].NNDR_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].NNDR_x0020_Ref;
+								if (WPQ2ListData.Row[rowItem].Account_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Account_x0020_Ref;
                             }
                             else
                             {
@@ -402,7 +412,6 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
 
                 wfFriendlyName = "Carbon copy";
                 submission = "Carbon copy will create a fresh copy of the document against a different account reference.";
-                //originalValuesDescription = "Not applicable for Carbon copy.";
                 workflowSuccessMessage = "The document(s) will be copied and added to the new account reference.";
                 break;
             case 'Index':
@@ -498,15 +507,8 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
     });
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////
-// function setWorkflowTypeInputParameters
-//
-///////////////////////////////////////////////////////////////////////////////////////////
-function setWorkflowTypeInputParameters(wfType) {
-
-}
-
 //////////////////////////////////////////////////////////////////////////////////
+// TRIGGER MULTIPLE SELECT WORKFLOWS
 // resetStuff()
 // Sets global variables back to empty for the next dialog/process
 //////////////////////////////////////////////////////////////////////////////////
@@ -529,6 +531,7 @@ function ResetStuff() {
 }
 
 //////////////////////////////////////////////////////////////////////////////////
+// TRIGGER MULTIPLE SELECT WORKFLOWS
 // StartWorkflow
 // itemID: The ID of the item.  Found by using GetSelectedItems.
 // subID: The subscription ID.  is found in List Workflow settings and passed in by custom action.
@@ -599,6 +602,7 @@ function startWorkflow(itemID, subID, lastItem) {
 }
 
 ////////////////////////////////////////////////////////////////
+// PEOPLE PICKER
 // Function: initializePeoplePicker
 // Render and initialize the client-side People Picker.
 ////////////////////////////////////////////////////////////////
@@ -621,6 +625,7 @@ function initializePeoplePicker(peoplePickerElementId) {
 }
 
 ////////////////////////////////////////////////////////////////
+// PEOPLE PICKER
 // Function: getUserInfo
 // Query the picker for user information.
 ////////////////////////////////////////////////////////////////
@@ -648,7 +653,7 @@ function getUserInfo() {
 }
 
 ////////////////////////////////////////////////////////////////
-
+// PEOPLE PICKER
 ////////////////////////////////////////////////////////////////
 function getPeoplePickerEmails() {
     // Get the people picker object from the page.
@@ -674,7 +679,7 @@ function getPeoplePickerEmails() {
 }
 
 ////////////////////////////////////////////////////////////////
-
+// PEOPLE PICKER
 ////////////////////////////////////////////////////////////////
 function getUserId(loginName) {
     var context = new SP.ClientContext.get_current();
@@ -687,7 +692,7 @@ function getUserId(loginName) {
 }
 
 ////////////////////////////////////////////////////////////////
-
+// PEOPLE PICKER
 ////////////////////////////////////////////////////////////////
 function ensureUserSuccess() {
     $('#userId').html(this.user.get_id());
@@ -699,4 +704,5 @@ function ensureUserSuccess() {
 function onFail(sender, args) {
     alert('Query failed. Error: ' + args.get_message());
 }
+
 </script>
