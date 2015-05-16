@@ -4,7 +4,7 @@
 <script type="text/javascript" src="/_layouts/15/sp.workflowservices.js"></script>
 <script type="text/javascript" src="/_layouts/15/clientpeoplepicker.js"></script>
 <script type="text/javascript" src="/_layouts/15/clientforms.js"></script>
-<script type="text/javascript" src="/_layouts/15/clienttemplates.js"></script>
+<!--<script type="text/javascript" src="/_layouts/15/clienttemplates.js"></script>-->
 <script type="text/javascript" src="/_layouts/15/autofill.js"></script>
 
 <script type="text/javascript">
@@ -17,7 +17,7 @@ var workflowName = null;
 var waitDialog = null;
 // The input parameters object should match the parameters that are set within the workflow.
 // For now we'll be manually building this up but there should be a way to dynamically create an input
-// parameter form based on workflow defintions (*optimistic*!)
+// parameter form based on workflow definitions (*optimistic*!)
 var inputParameters = {};
 var input = -1;
 var existingValues = {};
@@ -96,6 +96,7 @@ $(function(){
     ExecuteOrDelayUntilScriptLoaded(function() {
         if ((window.location.href.search("rbdoc/Revenues") !== -1) ||
             (window.location.href.search("rbdoc/Benefits") !== -1) ||
+			(window.location.href.search("rbdoc/Fraud") !== -1) ||
             (window.location.href.search("rbdoc/NNDR") !== -1)) {
             g_uploadType = DragDropMode.NOTSUPPORTED;
             SPDragDropManager.DragDropMode = DragDropMode.NOTSUPPORTED;
@@ -546,6 +547,7 @@ function startWorkflow(itemID, subID, lastItem) {
     var web = context.get_web();
 
     var wfServiceManager = SP.WorkflowServices.WorkflowServicesManager.newObject(context, web);
+	//var wfServiceManager = SP.WorkflowServices.WorkflowServicesManager(context, web);
     var subscription = wfServiceManager.getWorkflowSubscriptionService().getSubscription(subID);
 
     context.load(subscription);
@@ -571,7 +573,7 @@ function startWorkflow(itemID, subID, lastItem) {
                         options.html = element;
                         options.dialogReturnValueCallback = function (dialogResult) {
                             var redirect = "";
-                            if (wfFriendlyName === "Re-index") {
+                            if (wfFriendlyName === "Re-index" || wfFriendlyName === "Carbon copy") {
                                 redirect = "http://rbdoc/DropOffLibrary";
                             }
                             // Reset the input parameters object
