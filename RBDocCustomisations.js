@@ -156,6 +156,14 @@ function getReferenceError(type) {
     }[type];
 }
 
+////////////////////////////////////////////////////////////////
+// VALIDATION
+// Function: validateIndex
+// Validates the index screen.
+////////////////////////////////////////////////////////////////
+
+
+
 //////////////////////////////////////////////////
 // TRIGGER MULTIPLE SELECT WORKFLOWS
 // getSelectedItems()
@@ -250,8 +258,6 @@ function confirmDialog(url) {
     waitDialog = SP.UI.ModalDialog.showModalDialog(confirmOptions);
 }
 
-
-
 ////////////////////////////////////////////////////////////////
 // TRIGGER MULTIPLE SELECT WORKFLOWS
 // Function: ApplyMultiItemWorkflow
@@ -261,6 +267,7 @@ function confirmDialog(url) {
 ////////////////////////////////////////////////////////////////
 function ApplyMultiItemWorkflow(wfName, wfType) {
     var transferType = null;
+    var transferField = null;
     workflowName = wfName.split('_').join('-');
     context = new SP.ClientContext.get_current();
     web = context.get_web();
@@ -282,11 +289,23 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
             for (rowItem in WPQ2ListData.Row) {
                 if (WPQ2ListData.Row[rowItem].ID == selectedItemIds[i].id) {
                     items += WPQ2ListData.Row[rowItem].FileLeafRef + '<br/>';
-                    if (WPQ2ListData.Row[rowItem].CheckoutUser !== "") {
-                        multiContinueError += "One or more of the selected items are checked out.\n please ask the user who has checked this document out to check it in before continuing.";
+                    if (WPQ2ListData.Row[rowItem].CheckoutUser && WPQ2ListData.Row[rowItem].CheckoutUser !== "") {
+                        multiContinueError += "One or more of the selected items are checked out.\n Please ask the user who has checked this document out to check it in before continuing.";
                     }
                 }
             }
+        }
+
+        // May as well do this early as the transferField is used in the different workflows.
+        if (window.location.href.search("rbdoc/Revenues") !== -1) {
+            transferType = "revs";
+            transferField = "Account_x0020_Ref";
+        } else if (window.location.href.search("rbdoc/Benefits") !== -1) {
+            transferType = "claim";
+            transferField = "Claim_x0020_Ref";
+        } else if (window.location.href.search("rbdoc/NNDR") !== -1) {
+            transferType = "nndr";
+            transferField = "NNDR_x0020_Ref";
         }
 
         var originalValuesDescription = "";
@@ -295,26 +314,17 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
             case 'Transfer':
                 // For transfer we need to show
                 inputParameters.Reference = "";
-                if (window.location.href.search("rbdoc/Revenues") !== -1) {
-                    transferType = "revs";
-                } else if (window.location.href.search("rbdoc/Benefits") !== -1) {
-                    transferType = "claim";
-                } else if (window.location.href.search("rbdoc/NNDR") !== -1) {
-                    transferType = "nndr";
-                }
+                
 
                 for (l = 0 ; l < selectedItemIds.length ; l++) {
                     for (rowItem in WPQ2ListData.Row) {
                         if (WPQ2ListData.Row[rowItem].ID == selectedItemIds[l].id){
                             if (!existingValues.Reference) {
-                                if (WPQ2ListData.Row[rowItem].Reference) existingValues.Reference = WPQ2ListData.Row[rowItem].Reference;
-								if (WPQ2ListData.Row[rowItem].Claim_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Claim_x0020_Ref;
-								if (WPQ2ListData.Row[rowItem].NNDR_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].NNDR_x0020_Ref;
-								if (WPQ2ListData.Row[rowItem].Account_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Account_x0020_Ref;
+                                if (WPQ2ListData.Row[rowItem][transferField]) existingValues.Reference = WPQ2ListData.Row[rowItem][transferField];
                             }
                             else
                             {
-                                if (existingValues.Reference != WPQ2ListData.Row[rowItem].Reference){
+                                if (existingValues.Reference != WPQ2ListData.Row[rowItem][transferField]){
                                     multiContinueError += "You cannot bulk transfer items with different reference numbers.";
                                 }
                             }
@@ -352,15 +362,12 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
                     for (rowItem in WPQ2ListData.Row) {
                         if (WPQ2ListData.Row[rowItem].ID == selectedItemIds[l].id){
                             if (!existingValues.Reference) {
-                                if (WPQ2ListData.Row[rowItem].Reference) existingValues.Reference = WPQ2ListData.Row[rowItem].Reference;
-								if (WPQ2ListData.Row[rowItem].Claim_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Claim_x0020_Ref;
-								if (WPQ2ListData.Row[rowItem].NNDR_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].NNDR_x0020_Ref;
-								if (WPQ2ListData.Row[rowItem].Account_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Account_x0020_Ref;
+                                if (WPQ2ListData.Row[rowItem][transferField]) existingValues.Reference = WPQ2ListData.Row[rowItem][transferField];
                             }
                             else
                             {
-                                if (existingValues.Reference != WPQ2ListData.Row[rowItem].Reference){
-                                    multiContinueError = "Attempting multi-item workflow on records with different values.";
+                                if (existingValues.Reference != WPQ2ListData.Row[rowItem][transferField]){
+                                    multiContinueError += "You cannot bulk transfer items with different reference numbers.";
                                 }
                             }
                         }
@@ -376,7 +383,7 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
                 wfFriendlyName = "Add to batch print queue";
                 originalValuesDescription = "Not applicable for batch printing";
                 submission = "Document(s) will be added to the print queue.";
-                workflowSuccessMessage = "The document(s) will be added to the batch queue print.";
+                workflowSuccessMessage = "The document(s) will be added to the batch print queue.";
                 break;
             case 'WithdrawBatchPrint':
                 // Batch print parameters: none
@@ -395,15 +402,12 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
 
                         if (WPQ2ListData.Row[rowItem].ID == selectedItemIds[l].id){
                             if (!existingValues.Reference) {
-                                if (WPQ2ListData.Row[rowItem].Reference) existingValues.Reference = WPQ2ListData.Row[rowItem].Reference;
-								if (WPQ2ListData.Row[rowItem].Claim_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Claim_x0020_Ref;
-								if (WPQ2ListData.Row[rowItem].NNDR_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].NNDR_x0020_Ref;
-								if (WPQ2ListData.Row[rowItem].Account_x0020_Ref) existingValues.Reference = WPQ2ListData.Row[rowItem].Account_x0020_Ref;
+                                if (WPQ2ListData.Row[rowItem][transferField]) existingValues.Reference = WPQ2ListData.Row[rowItem][transferField];
                             }
                             else
                             {
-                                if (existingValues.Reference != WPQ2ListData.Row[rowItem].Reference) {
-                                    multiContinueError = "Attempting multi-item workflow on records with different values.";
+                                if (existingValues.Reference != WPQ2ListData.Row[rowItem][transferField]){
+                                    multiContinueError += "You cannot bulk transfer items with different reference numbers.";
                                 }
                             }
                         }
@@ -412,7 +416,7 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
 
                 wfFriendlyName = "Carbon copy";
                 submission = "Carbon copy will create a fresh copy of the document against a different account reference.";
-                workflowSuccessMessage = "The document(s) will be copied and added to the new account reference.";
+                workflowSuccessMessage = "The document(s) will be copied and added to the new account reference and sent to the drop off library.";
                 break;
             case 'Index':
                 wfFriendlyName = "Index";
@@ -577,7 +581,7 @@ function startWorkflow(itemID, subID, lastItem) {
                             if (redirect !== "") {
                                 setTimeout(function(){
                                     window.location.replace(redirect);
-                                }, 3000);
+                                }, 2000);
                             }
                             else {
                                 SP.UI.ModalDialog.RefreshPage(1);
