@@ -1,10 +1,5 @@
-<!-- Reference jQuery on the Google CDN -->
 <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
-<!-- Reference SPServices on cdnjs (Cloudflare) -->
 <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/jquery.SPServices/2014.02/jquery.SPServices-2014.02.min.js"></script>
-<!--<script type="text/javascript" src="/_layouts/15/sp.js"></script>
-<script type="text/javascript" src="/_layouts/15/sp.core.js"></script>
-<script type="text/javascript" src="/_layouts/15/sp.runtime.js"></script>-->
 
 <script type="text/javascript" src="/_layouts/15/sp.workflowservices.js"></script>
 <script type="text/javascript" src="/_layouts/15/clientpeoplepicker.js"></script>
@@ -93,7 +88,6 @@ $(function(){
             }
         }
     }, 1000);
-
 
     //////////////////////////////////////////////////
     // REQUEST: DISABLE drag and drop for record libraries
@@ -298,13 +292,10 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
 
         // May as well do this early as the transferField is used in the different workflows.
         if (window.location.href.search("rbdoc/Revenues") !== -1) {
-            transferType = "revs";
             transferField = "Account_x0020_Ref";
         } else if (window.location.href.search("rbdoc/Benefits") !== -1) {
-            transferType = "claim";
             transferField = "Claim_x0020_Ref";
         } else if (window.location.href.search("rbdoc/NNDR") !== -1) {
-            transferType = "nndr";
             transferField = "NNDR_x0020_Ref";
         }
 
@@ -315,6 +306,13 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
                 // For transfer we need to show
                 inputParameters.Reference = "";
                 
+				if (window.location.href.search("rbdoc/Revenues") !== -1) {
+					transferType = "revs";
+				} else if (window.location.href.search("rbdoc/Benefits") !== -1) {
+					transferType = "claim";
+				} else if (window.location.href.search("rbdoc/NNDR") !== -1) {
+					transferType = "nndr";
+				}
 
                 for (l = 0 ; l < selectedItemIds.length ; l++) {
                     for (rowItem in WPQ2ListData.Row) {
