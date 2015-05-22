@@ -107,35 +107,90 @@ $(function(){
 
 ////////////////////////////////////////////////////////////////
 // VALIDATION
+// Function: PreSaveAction
+// Automatically runs when form is submitted.
+////////////////////////////////////////////////////////////////
+function PreSaveAction() {
+
+    // Get the current input
+    var input = $("input[value='Reference'],input[value='Reference'],input[value='Reference']");
+    var typeString = $("input[value='Content Type']");
+    var type = "";
+
+    if (typeString && typeString.indexOf('Revenues') != -1 ) type = 'A';
+    if (typeString && typeString.indexOf('Benefits') != -1 ) type = 'C';
+    if (typeString && typeString.indexOf('Appeals') != -1 ) type = 'C';
+    if (typeString && typeString.indexOf('NNDR') != -1 ) type = 'N';
+
+    if (input && typeString) {
+        // Basic validation
+        if(input.val() && input.val().length > 0) {
+            // Validation
+            if (VerifyReference(input.val(), type)) {
+                return true;
+            } else {
+                alert('Invalid reference number.');
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////
+// VALIDATION
 // Function: VerifyReference
 // Verifies that a reference number meets the requiremnts
 // Inputs:  reference = the reference number (as a number)
 //          type = the type of reference, as a string. See code for details
 ////////////////////////////////////////////////////////////////
 function VerifyReference(reference, type) {
-    var isInt = function (n) {
-        return n % 1 === 0;
-    };
-    if (typeof reference !== "number" || !isInt(reference)){
-        console.warn(reference, "is not an integer");
-        return false;
-    }
-    switch (type) {
-        case "revs":
-            // 700XXXXX or XXXXXX
-            return (69999999 < reference && reference < 70100000 ||
-                   999999 < reference && reference < 10000000);
-        case "claim":
-            //1-7 digits
-            return 0 < reference && reference < 10000000;
-        case "nndr":
-            // 3XXXXXX
-            return 2999999 < reference && reference < 4000000;
-        case "bid":
-            // 777XXXX
-            return 7769999 < reference && reference < 778000000;
-        default: return false;
-    }
+    //var isInt = function (n) {
+    //    return n % 1 === 0;
+    //};
+    //if (typeof reference !== "number" || !isInt(reference)){
+    //    console.warn(reference, "is not an integer");
+    //    return false;
+    //}
+    //switch (type) {
+    //    case "revs":
+    //        // 700XXXXX or XXXXXX
+    //        return (69999999 < reference && reference < 70100000 ||
+    //               999999 < reference && reference < 10000000);
+    //    case "claim":
+    //        //1-7 digits
+    //        return 0 < reference && reference < 10000000;
+    //    case "nndr":
+    //        // 3XXXXXX
+    //        return 2999999 < reference && reference < 4000000;
+    //    case "bid":
+    //        // 777XXXX
+    //        return 7769999 < reference && reference < 778000000;
+    //    default: return false;
+    //}
+
+    // Now using a webservice to verify the webservice directly against revs and bens.
+
+    $.support.cors = true;
+    $.ajax({
+        url: 'http://vm-ms-spt-1b:8080/Service1.svc/GetData',
+        dataType: "json",
+        type: 'POST',
+        contentType: "application/json; charset=utf-8",
+        data: '{ "value": "' + reference + '", "type": "' + type + '" }',
+        success: function (data) {
+            if (data && data.GetDataResult && data.GetDataResult.length == 4) {
+                if (data.GetDataResult[1] == 'true') return true;
+                return false;
+            } else {
+                return false;
+            }
+        },
+        error: function(error) {
+            return false;
+        }
+    });
 }
 
 ////////////////////////////////////////////////////////////////
@@ -150,14 +205,6 @@ function getReferenceError(type) {
         "bid":"Must be 7 digits long and begin with 777"
     }[type];
 }
-
-////////////////////////////////////////////////////////////////
-// VALIDATION
-// Function: validateIndex
-// Validates the index screen.
-////////////////////////////////////////////////////////////////
-
-
 
 //////////////////////////////////////////////////
 // TRIGGER MULTIPLE SELECT WORKFLOWS
@@ -291,13 +338,18 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
             }
         }
 
-        // May as well do this early as the transferField is used in the different workflows.
-        if (window.location.href.search("rbdoc/Revenues") !== -1) {
-            transferField = "Account_x0020_Ref";
-        } else if (window.location.href.search("rbdoc/Benefits") !== -1) {
-            transferField = "Claim_x0020_Ref";
-        } else if (window.location.href.search("rbdoc/NNDR") !== -1) {
-            transferField = "NNDR_x0020_Ref";
+        if (wfType == 'Transfer' || wfType == 'ReIndex' || wfType == 'CarbonCopy') {
+            // May as well do this early as the transferField is used in the different workflows.
+            if (window.location.href.search("rbdoc/Revenues") !== -1) {
+                transferField = "Account_x0020_Ref";
+                transferType = "revs";
+            } else if (window.location.href.search("rbdoc/Benefits") !== -1) {
+                transferField = "Claim_x0020_Ref";
+                transferType = "claim";
+            } else if (window.location.href.search("rbdoc/NNDR") !== -1) {
+                transferField = "NNDR_x0020_Ref";
+                transferType = "nndr";
+            }
         }
 
         var originalValuesDescription = "";
@@ -306,14 +358,6 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
             case 'Transfer':
                 // For transfer we need to show
                 inputParameters.Reference = "";
-                
-				if (window.location.href.search("rbdoc/Revenues") !== -1) {
-					transferType = "revs";
-				} else if (window.location.href.search("rbdoc/Benefits") !== -1) {
-					transferType = "claim";
-				} else if (window.location.href.search("rbdoc/NNDR") !== -1) {
-					transferType = "nndr";
-				}
 
                 for (l = 0 ; l < selectedItemIds.length ; l++) {
                     for (rowItem in WPQ2ListData.Row) {
