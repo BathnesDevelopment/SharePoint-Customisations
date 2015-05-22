@@ -91,7 +91,7 @@ $(function(){
 
     //////////////////////////////////////////////////
     // REQUEST: DISABLE drag and drop for record libraries
-	// Users have requested that drag and drop be disabled in the main record libraries.
+    // Users have requested that drag and drop be disabled in the main record libraries.
     //////////////////////////////////////////////////
     ExecuteOrDelayUntilScriptLoaded(function() {
         if ((window.location.href.search("rbdoc/Revenues") !== -1) ||
@@ -113,30 +113,41 @@ $(function(){
 function PreSaveAction() {
 
     // Get the current input
-    var input = $("input[value='Reference'],input[value='Reference'],input[value='Reference']");
-    var typeString = $("input[value='Content Type']");
+    var inputA = $(":input[title='Account Reference Required Field']");
+    var inputC = $(":input[title='Claim Ref Required Field']");
+    var inputN = $(":input[title='NNDR Reference Required Field']");
+    var input;
+
+    var typeString = $("select[title='Content Type'] option:selected").text();
     var type = "";
 
-    if (typeString && typeString.indexOf('Revenues') != -1 ) type = 'A';
-    if (typeString && typeString.indexOf('Benefits') != -1 ) type = 'C';
-    if (typeString && typeString.indexOf('Appeals') != -1 ) type = 'C';
-    if (typeString && typeString.indexOf('NNDR') != -1 ) type = 'N';
-
-    if (input && typeString) {
-        // Basic validation
-        if(input.val() && input.val().length > 0) {
-            // Validation
-            if (VerifyReference(input.val(), type)) {
-                return true;
-            } else {
-                alert('Invalid reference number.');
-                return false;
-            }
+    if (typeString && typeString.indexOf('Revenues') != -1 ) {
+        type = 'A';
+        input = inputA;
+    }
+    if (typeString && typeString.indexOf('Benefits') != -1 ) {
+        type = 'C';
+        input = inputC;
+    }
+    if (typeString && typeString.indexOf('Appeals') != -1 ) {
+        type = 'C';
+        input = inputC;
+    }
+    if (typeString && typeString.indexOf('NNDR') != -1 ) {
+        type = 'N';
+        input = inputN;
+    }
+    
+    if (input) {
+        if (VerifyReference(input.val(), type)) {
+            return true;
         } else {
+            alert('Invalid reference number.');
             return false;
         }
     }
 }
+
 
 ////////////////////////////////////////////////////////////////
 // VALIDATION
@@ -146,51 +157,25 @@ function PreSaveAction() {
 //          type = the type of reference, as a string. See code for details
 ////////////////////////////////////////////////////////////////
 function VerifyReference(reference, type) {
-    //var isInt = function (n) {
-    //    return n % 1 === 0;
-    //};
-    //if (typeof reference !== "number" || !isInt(reference)){
-    //    console.warn(reference, "is not an integer");
-    //    return false;
-    //}
-    //switch (type) {
-    //    case "revs":
-    //        // 700XXXXX or XXXXXX
-    //        return (69999999 < reference && reference < 70100000 ||
-    //               999999 < reference && reference < 10000000);
-    //    case "claim":
-    //        //1-7 digits
-    //        return 0 < reference && reference < 10000000;
-    //    case "nndr":
-    //        // 3XXXXXX
-    //        return 2999999 < reference && reference < 4000000;
-    //    case "bid":
-    //        // 777XXXX
-    //        return 7769999 < reference && reference < 778000000;
-    //    default: return false;
-    //}
 
     // Now using a webservice to verify the webservice directly against revs and bens.
-
+    var result = false;
     $.support.cors = true;
     $.ajax({
         url: 'http://vm-ms-spt-1b:8080/Service1.svc/GetData',
         dataType: "json",
         type: 'POST',
+        async: false,
         contentType: "application/json; charset=utf-8",
         data: '{ "value": "' + reference + '", "type": "' + type + '" }',
         success: function (data) {
             if (data && data.GetDataResult && data.GetDataResult.length == 4) {
-                if (data.GetDataResult[1] == 'true') return true;
-                return false;
-            } else {
-                return false;
+                if (data.GetDataResult[1] == 'true') result = true;
             }
-        },
-        error: function(error) {
-            return false;
         }
     });
+
+    return result;
 }
 
 ////////////////////////////////////////////////////////////////
@@ -342,13 +327,13 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
             // May as well do this early as the transferField is used in the different workflows.
             if (window.location.href.search("rbdoc/Revenues") !== -1) {
                 transferField = "Account_x0020_Ref";
-                transferType = "revs";
+                transferType = "A";
             } else if (window.location.href.search("rbdoc/Benefits") !== -1) {
                 transferField = "Claim_x0020_Ref";
-                transferType = "claim";
+                transferType = "C";
             } else if (window.location.href.search("rbdoc/NNDR") !== -1) {
                 transferField = "NNDR_x0020_Ref";
-                transferType = "nndr";
+                transferType = "N";
             }
         }
 
@@ -535,19 +520,19 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
                             //}
                             for (var z = 0; z < selectedItemIds.length; z++) {
                                 //for (var rowItem in WPQ2ListData.Row) {
-                                    //if ((WPQ2ListData.Row[rowItem].ID == selectedItemIds[z].id) && !lastItem){
-                                    if (!lastItem){
-                                        if ((z == selectedItemIds.length - 1) || runOnce) lastItem = true;
-                                        startWorkflow(selectedItems[z].get_item('ID'), workflowName, lastItem);
-                                    }
+                                //if ((WPQ2ListData.Row[rowItem].ID == selectedItemIds[z].id) && !lastItem){
+                                if (!lastItem){
+                                    if ((z == selectedItemIds.length - 1) || runOnce) lastItem = true;
+                                    startWorkflow(selectedItems[z].get_item('ID'), workflowName, lastItem);
+                                }
                                 //}
                             }
                         } else {ResetStuff();}
                     };
                     waitDialog = SP.UI.ModalDialog.showModalDialog(confirmOptions);
 
-            } else { ResetStuff(); }
-        };
+                } else { ResetStuff(); }
+            };
             waitDialog = SP.UI.ModalDialog.showModalDialog(options);
             initializePeoplePicker('peoplePickerDiv');
         }
@@ -591,7 +576,7 @@ function startWorkflow(itemID, subID, lastItem) {
     var web = context.get_web();
 
     var wfServiceManager = SP.WorkflowServices.WorkflowServicesManager.newObject(context, web);
-	//var wfServiceManager = SP.WorkflowServices.WorkflowServicesManager(context, web);
+    //var wfServiceManager = SP.WorkflowServices.WorkflowServicesManager(context, web);
     var subscription = wfServiceManager.getWorkflowSubscriptionService().getSubscription(subID);
 
     context.load(subscription);
