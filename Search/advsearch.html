@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<title>Test sharepoint form</title>
+
+<script src="//code.jquery.com/jquery-1.10.2.js"></script>
+<script src="//code.jquery.com/ui/1.11.3/jquery-ui.js"></script>
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>
+<link rel="stylesheet" href="//code.jquery.com/ui/1.11.3/themes/smoothness/jquery-ui.css">
+<link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css" rel="stylesheet">
+<script>
+window.SETTINGS = {};
+jQuery(function($){
+    $.datepicker.regional['en-GB'] = {
+        closeText: 'Done',
+        prevText: 'Prev',
+        nextText: 'Next',
+        currentText: 'Today',
+        monthNames: ['January','February','March','April','May','June',
+        'July','August','September','October','November','December'],
+        monthNamesShort: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        dayNames: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+        dayNamesShort: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        dayNamesMin: ['Su','Mo','Tu','We','Th','Fr','Sa'],
+        weekHeader: 'Wk',
+        dateFormat: 'dd/mm/yy',
+        firstDay: 1,
+        isRTL: false,
+        showMonthAfterYear: false,
+        yearSuffix: ''};
+    $.datepicker.setDefaults($.datepicker.regional['en-GB']);
+});
+$(function() {
+    $('#from').datepicker({
+        onClose: function ( dateText ) {
+            SETTINGS.from = dateText;
+        }
+    });
+    $('#to').datepicker({
+        onClose: function ( dateText ) {
+            SETTINGS.to = dateText;
+        }
+    });
+    $('#search').click(search);
+});
+var search = function() {
+    window.location.href = getURL() + getQuery();
+};
+var getURL = function() {
+    res = "";
+
+    var funcArea = $('#fArea').val();
+
+    if (funcArea === "All") {
+       res = "http://rbdoc/Search/Pages/results.aspx";
+    } else if (funcArea === "Revenues") {
+       res = "http://rbdoc/Search/Pages/Revenues.aspx";
+    } else if (funcArea === "Benefits") {
+        res = "http://rbdoc/Search/Pages/Benefits.aspx";
+    } else if (funcArea === "NNDR" ) {
+        res = "http://rbdoc/Search/Pages/NNDR.aspx";
+    }
+
+    return res + "?#k=";
+};
+var getQuery = function() {
+
+    var res = "";
+    SETTINGS.all = $('#all').val();
+    SETTINGS.exact = $('#exact').val();
+    SETTINGS.any = $('#any').val();
+    SETTINGS.none = $('#none').val();
+    SETTINGS.modifiedBy = $('#modifiedBy').val();
+    SETTINGS.ref = $('#ref').val();
+    SETTINGS.from = $('#from').val();
+    SETTINGS.to = $('#to').val();
+
+    var addSpace = function() {
+        if ("" !== res) {
+            res += " ";
+        }
+    };
+    if (SETTINGS.ref) {
+        addSpace();
+        res += "Ref:" + SETTINGS.ref;
+        if (!$("#exactRef").is(':checked')) {
+            res += "*";
+        }
+    }
+    if (SETTINGS.all) {
+        addSpace();
+        res += "ALL(" + SETTINGS.all + ")";
+    }
+    if (SETTINGS.exact) {
+        addSpace();
+        res += "\"" + SETTINGS.exact + "\"";
+    }
+    if (SETTINGS.any) {
+        addSpace();
+        res += "ANY(" + SETTINGS.any + ")";
+    }
+    if (SETTINGS.none) {
+        addSpace();
+        res += "NONE(" + SETTINGS.none + ")";
+    }
+    if (SETTINGS.from && SETTINGS.to) {
+        addSpace();
+        res += "Modified:"+ SETTINGS.from + ".." + SETTINGS.to;
+    }
+    if (SETTINGS.modifiedBy) {
+        addSpace();
+        res += "ModifiedBy:\"" + SETTINGS.modifiedBy;
+        if (!$("#exactMod").is(':checked')) {
+            res += "*";
+        }
+        res += "\"";
+    }
+    return res;
+};
+</script>
+</head>
+<body>
+    <h3>Show documents containing</h3>
+    <div class="form-horizontal" role="form">
+        <div class="form-group">
+            <label class="control-label col-sm-2" for="all">All of these words</label>
+            <div class="col-sm-8"><input type ="text" class="form-control" id = "all"></div>
+        </div>
+        <div class="form-group">
+            <label class="control-label col-sm-2" for="exact">The exact phrase</label>
+            <div class="col-sm-8"><input type ="text" class="form-control"  id = "exact"></div>
+        </div>
+        <div class="form-group">
+            <label class="control-label col-sm-2" for="any">Any of these words</label>
+            <div class="col-sm-8"><input type ="text" class="form-control"  id = "any"></div>
+        </div>
+        <div class="form-group">
+            <label class="control-label col-sm-2" for="none">None of these words</label>
+            <div class="col-sm-8"><input type ="text" class="form-control"  id = "none"></div>
+        </div>
+        <h3>Where</h3>
+        <div class="form-group">
+            <label class="control-label col-sm-2" for="ref">Reference</label>
+            <div class="col-sm-7"><input type ="text" class="form-control" id = "ref"></div>
+            <label class="col-sm-1">
+                <input type="checkbox" id="exactRef"> Exact
+            </label>
+        </div>
+        <div class="form-group">
+            <label class="control-label col-sm-2" for="from">Modified date</label>
+            <div class="col-sm-4"><input type ="text" class="form-control"  placeholder="Start - DD/MM/YYYY" id = "from"></div>
+            <div class="col-sm-4"><input type ="text" class="form-control"  placeholder="End - DD/MM/YYYY" id = "to"></div>
+        </div>
+        <div class="form-group">
+            <label class="control-label col-sm-2" for="modifiedBy">Author</label>
+            <div class="col-sm-7"><input type ="text" class="form-control" id = "modifiedBy"></div>
+            <label class="col-sm-1">
+                <input type="checkbox" id="exactMod"> Exact
+            </label>
+        </div>
+        <div class="form-group">
+            <label class="control-label col-sm-2" for="from">Functional Area</label>
+            <div class="col-sm-8"><select class="form-control " id="fArea">
+                <option>All</option>
+                <option>Revenues</option>
+                <option>Benefits</option>
+                <option>NNDR</option>
+            </select></div>
+        </div>
+        <a class="btn btn-default" id="search">Search</a>
+    </div>
+</body></html>
