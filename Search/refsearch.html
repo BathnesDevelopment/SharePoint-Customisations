@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<title>Test sharepoint form</title>
+
+<script src="//code.jquery.com/jquery-1.10.2.js"></script>
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>
+<link rel="stylesheet" href="//code.jquery.com/ui/1.11.3/themes/smoothness/jquery-ui.css">
+<link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css" rel="stylesheet">
+<script>
+$(function() {
+    $('#search').click(search);
+    if (window.localStorage && window.localStorage.fArea) {
+        $('#fArea').val(window.localStorage.fArea);
+    }
+});
+var search = function() {
+    window.location.href = getURL() + getQuery();
+};
+var getURL = function() {
+    res = "";
+
+    var funcArea = $('#fArea').val();
+    window.localStorage.fArea = $('#fArea').val(); // store for later
+
+    if (isWildcardSearch()) {
+        // Use FilterMultiValue to perform the wildcard search
+        if (funcArea === "Revenues") {
+           res = "http://rbdoc/revenues/Forms/AllItems.aspx?FilterName=Account_x0020_Reference&FilterMultiValue=";
+        } else if (funcArea === "Benefits") {
+            res = "http://rbdoc/benefits/Forms/AllItems.aspx?FilterName=Claim_x0020_Ref&FilterMultiValue=";
+        } else if (funcArea === "NNDR" ) {
+            res = "http://rbdoc/nndr/Forms/AllItems.aspx?FilterName=NNDR%5Fx0020%5FReference&FilterMultiValue=";
+        } else if (funcArea === "Fraud, Revenues") {
+            res = "http://rbdoc/fraud/Forms/AllItems.aspx?FilterName=Account_x0020_Reference&FilterMultiValue=";
+        } else if (funcArea === "Fraud, Benefits") {
+            res = "http://rbdoc/fraud/Forms/AllItems.aspx?FilterName=Claim_x0020_Ref&FilterMultiValue=";
+        }
+    } else {
+        // User FilterField so that we can refine afterwards
+        if (funcArea === "Revenues") {
+           res = "http://rbdoc/revenues/Forms/AllItems.aspx?FilterField1=Account_x0020_Reference&FilterValue1=";
+        } else if (funcArea === "Benefits") {
+            res = "http://rbdoc/benefits/Forms/AllItems.aspx?FilterField1=Claim_x0020_Ref&FilterValue1=";
+        } else if (funcArea === "NNDR" ) {
+            res = "http://rbdoc/nndr/Forms/AllItems.aspx?FilterField1=NNDR%5Fx0020%5FReference&FilterValue1=";
+        } else if (funcArea === "Fraud, Revenues") {
+            res = "http://rbdoc/fraud/Forms/AllItems.aspx?FilterField1=Account_x0020_Reference&FilterValue1=";
+        } else if (funcArea === "Fraud, Benefits") {
+            res = "http://rbdoc/fraud/Forms/AllItems.aspx?FilterField1=Claim_x0020_Ref&FilterValue1=";
+        }
+    }
+
+    return res;
+};
+var isWildcardSearch = function() {
+    return $('#ref').val().indexOf("*") !== -1;
+};
+var getQuery = function() {
+    return $('#ref').val();
+};
+</script>
+</head>
+<body>
+    <form>
+    <div class="form-horizontal" role="form">
+        <div class="form-group">
+            <label class="control-label col-sm-2" for="ref">Reference</label>
+            <div class="col-sm-7"><input type ="text" class="form-control" id = "ref"></div>
+        </div>
+        <div class="form-group">
+            <label class="control-label col-sm-2" for="from">Functional Area</label>
+            <div class="col-sm-3"><select class="form-control " id="fArea">
+                <option>Revenues</option>
+                <option>Benefits</option>
+                <option>NNDR</option>
+                <option>Fraud, Revenues</option>
+                <option>Fraud, Benefits</option>
+            </select></div>
+        <a class="col-sm-4 btn btn-default" id="search" type = "submit" onclick = "search">Search</a>
+        </div>
+    </div>
+</form></body></html>
