@@ -9,14 +9,24 @@
 <mso:ContentTypeId msdt:dt="string">0x0101002039C03B61C64EC4A04F5361F385106603</mso:ContentTypeId>
 <mso:TargetControlType msdt:dt="string">;#SearchResults;#</mso:TargetControlType>
 <mso:HtmlDesignAssociated msdt:dt="string">1</mso:HtmlDesignAssociated>
-<mso:ManagedPropertyMapping msdt:dt="string">'Title':'Title','Path':'Path','Description':'Description','EditorOWSUSER':'EditorOWSUSER','LastModifiedTime':'LastModifiedTime','CollapsingStatus':'CollapsingStatus','DocId':'DocId','Ref':'Ref',HitHighlightedSummary':'HitHighlightedSummary','HitHighlightedProperties':'HitHighlightedProperties','FileExtension':'FileExtension','ViewsLifeTime':'ViewsLifeTime','ParentLink':'ParentLink','FileType':'FileType','IsContainer':'IsContainer','SecondaryFileExtension':'SecondaryFileExtension','DisplayAuthor':'DisplayAuthor'</mso:ManagedPropertyMapping>
+<mso:ManagedPropertyMapping msdt:dt="string">'Title':'Title','Path':'Path','Description':'Description','EditorOWSUSER':'EditorOWSUSER','LastModifiedTime':'LastModifiedTime','CollapsingStatus':'CollapsingStatus','DocId':'DocId','Ref':'Ref','DocLibPath':'DocLibPath',HitHighlightedSummary':'HitHighlightedSummary','HitHighlightedProperties':'HitHighlightedProperties','FileExtension':'FileExtension','ViewsLifeTime':'ViewsLifeTime','ParentLink':'ParentLink','FileType':'FileType','IsContainer':'IsContainer','SecondaryFileExtension':'SecondaryFileExtension','DisplayAuthor':'DisplayAuthor','Label':'Label'</mso:ManagedPropertyMapping>
 </mso:CustomDocumentProperties>
 </xml><![endif]-->
 </head>
 <body>
     <div id="Table_Default">
         <!--#_
+                console.log(ctx.CurrentItem);
                 if(!$isNull(ctx.CurrentItem) && !$isNull(ctx.ClientControl)){
+                    if (!ctx.CurrentItem.Title) {
+                      ctx.CurrentItem.Title = ctx.CurrentItem.Path.split("/").pop();
+                    }
+                    if (ctx.CurrentItem.DocLibPath) {
+                      ctx.CurrentItem.DocLibPath = ctx.CurrentItem.DocLibPath.slice(8);
+                    } else {
+                      ctx.CurrentItem.DocLibPath = "http://rbdoc/revenues/Forms/AllItems.aspx?FilterField1=Account_x0020_Reference&FilterValue1=" + ctx.CurrentItem.Ref;
+                    }
+
                     var id = ctx.ClientControl.get_nextUniqueId();
                     var itemId = id + Srch.U.Ids.item;
                     var hoverId = id + Srch.U.Ids.hover;
@@ -91,36 +101,26 @@
                   };
 
         _#-->
-        <div style="display:table;width:1050px;">
-            <div id="_#= $htmlEncode(itemId) =#_" name="Item" data-displaytemplate="DefaultTable" class="ms-srch-item" style="display: table-row;background-color: _#=getBackgroundColor()=#_;" >
-                <div style="min-width:300px;width:300px;max-width:300px;display: table-cell;white-space:nowrap;overflow:hidden;-ms-text-overflow:ellipsis;-o-text-overflow:ellipsis;text-overflow:ellipsis;">
+            <tr id="_#= $htmlEncode(itemId) =#_" name="Item" data-displaytemplate="DefaultTable" class="ms-srch-item" style="display: table-row;background-color: _#=getBackgroundColor()=#_;" >
+                <td style="min-width:150px;max-width:150px; overflow-wrap: break-word;">
                     <a href="_#=ctx.CurrentItem.Path=#_">_#=ctx.CurrentItem.Title=#_</a>
-                </div>
-                <div style="min-width:300px;width:300px;max-width:300px;display: table-cell;white-space:nowrap;overflow:hidden;-ms-text-overflow:ellipsis;-o-text-overflow:ellipsis;text-overflow:ellipsis;">
-                    <a href="_#= $urlHtmlEncode(ctx.CurrentItem.ParentLink) =#_?FilterField1=Reference&FilterValue1=_#=formatProperties(ctx.CurrentItem.Ref)=#_">_#=formatProperties(ctx.CurrentItem.Ref)=#_</a>
-                </div>
-                <div style="min-width:150px;width:300px;max-width:300px;display: table-cell;white-space:nowrap;overflow:hidden;-ms-text-overflow:ellipsis;-o-text-overflow:ellipsis;text-overflow:ellipsis;">
+                </td>
+                <td style="min-width:100px;max-width:100px;">
+                  <a href="_#=ctx.CurrentItem.DocLibPath=#_"> _#=formatProperties(ctx.CurrentItem.Ref)=#_</a>
+                </td>
+                <td style="min-width:150px;max-width:150px;">
+                    _#=formatDelimiters(ctx.CurrentItem.Label)=#_
+                </td>
+                <td style="min-width:150px;max-width:150px;">
                     _#=formatDelimiters(ctx.CurrentItem.DisplayAuthor)=#_
-                </div>
-                <div style="min-width:150px;width:150px;max-width:150px;display: table-cell;white-space:nowrap;overflow:hidden;-ms-text-overflow:ellipsis;-o-text-overflow:ellipsis;text-overflow:ellipsis;">
+                </td>
+                <td style="min-width:150px;max-width:150px;">
                     _#=formatAccountName(ctx.CurrentItem.EditorOWSUSER)=#_
-                </div>
-                <div style="min-width:150px;width:150px;max-width:150px;display: table-cell;white-space:nowrap;overflow:hidden;-ms-text-overflow:ellipsis;-o-text-overflow:ellipsis;text-overflow:ellipsis;">
+                </td>
+                <td style="min-width:150px;max-width:150px;">
                     _#=formatDate(ctx.CurrentItem.LastModifiedTime)=#_
-                </div>
-            </div>
-        </div>
-
-        <div id="_#= $htmlEncode(hoverId) =#_" style="display:none;padding:15px;width:1050px;">
-            <div style="background-color:#fff;box-shadow:10px 10px 5px #888;border:1px #000 solid;padding:10px;">
-                <div style="font-weight:bold">
-                    _#=ctx.CurrentItem.Title=#_
-                </div>
-                <div>
-                    _#=STSHtmlDecode(ctx.CurrentItem.HitHighlightedSummary)=#_
-                </div>
-            </div>
-        </div>
+                </td>
+            </tr>
         <!--#_
                 }
         _#-->
