@@ -1,30 +1,837 @@
 Add-PSSnapin Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue
 
 # Function to Upload File
-function UploadFile($WebURL, $DocLibName, $FilePath)
+function UploadFile($WebURL, $DocLibName, $FilePath, $ContentType, $DocumentGuid, $Reference, $CreatedDate, $Title)
 {
 	# Get the SharePoint Web & Lists to upload the file
 	$Web = Get-SPWeb $WebURL
+	$Site = Get-SPSite $WebURL
 	$List = $Web.GetFolder($DocLibName)
 	
 	# Get the Files collection from SharePoint Document Library
 	$Files = $List.Files
 	
 	# Get File Name from Path
-	$FileName = $FilePath.Substring($FilePath.LastIndexOf("\")+1)
-	
+	$FileName = $FilePath.Substring($FilePath.LastIndexOf("\") + 1)
+
 	# Get the File from Disk
-	$File= Get-ChildItem $FilePath
-	
-	# Set the Metadata
+	$File = Get-ChildItem $FilePath
+
 	$Metadata = @{}
-	$Metadata.add("Account reference", "123456")
-	
+
 	# Add File to Files collection of Document Library
-	$Files.Add($DocLibName +"/" + $FileName,$File.OpenRead(), $Metadata,  $true) #true for overwrite file, if already exists!
+	$UploadedFile = $Files.Add($DocLibName + "/" + $FileName, $File.OpenRead(), $Metadata,  $true) #true for overwrite file, if already exists!
+
+	$UploadedFile.Item["Content Type"] = $ContentType
+	$UploadedFile.Item["Created"] = $CreatedDate
+
+	# Benefits documents
+	if ($ContentType -like '*Benefits*') { 
+		$UploadedFile.Item["Document Label (Bens)"] = $DocumentGuid
+		$UploadedFile.Item["Reference"] = $Reference
+	}
+
+	if ($ContentType -like '*Appeal*') { 
+		$UploadedFile.Item["Document Label (Bens)"] = $DocumentGuid
+		$UploadedFile.Item["Reference"] = $Reference
+	}
+	
+	# Revenues documents
+	if ($ContentType -like '*Revenues*') { 
+		$UploadedFile.Item["Document Label (Revs)"] = $DocumentGuid
+		$UploadedFile.Item["Reference"] = $Reference
+	}
+	
+	# NNDR documents
+	if ($ContentType -like '*NNDR*') { 
+		$UploadedFile.Item["Document Label (NNDR)"] = $DocumentGuid
+		$UploadedFile.Item["Reference"] = $Reference
+	}
+
+	# Title is common to all types.  There is no default title for the migration so we use the file name.
+	$UploadedFile.Item["Title"] = $Title
+	$UploadedFile.Item.Update()
 }
 
-# Call the upload function
-UploadFile "http://Spaniel/","DropOffLibrary" "C:\Users\rowed1\Desktop\regex.txt"
+$ImportCSV = import-csv C:\Migration\CTaxIndexSub.csv
 
-# Read more: http://www.sharepointdiary.com/2012/07/upload-file-to-sharepoint-library-using-powershell.html#ixzz3aZeS3Bi9
+foreach($file in $ImportCSV)
+{
+	$Reference = $file.AcRef
+	$Date = $file.DateRcvd
+	$TypeCode = $file.RefNo
+	$DocLabelCode = $file.TypeTag
+	
+	$Path = '\\rai\t$\ExportWorkingFolder\CTAXLargeScale' + $file.ExportFileName
+	
+	# Content type, document label, and GUID will be set in switch statements.
+	$ContentType = ''
+	$DocumentLabel = ''
+	$DocumentGuid = ''
+	
+	# Some account references will have checks in - remove these.
+	$pattern = '[^a-zA-Z]'
+	$Reference -replace $pattern, ' '
+	
+	# Convert the created date
+	$CreatedDate = Get-Date $Date
+
+	switch ($TypeCode)
+    {
+        'CS-REVS-01' { $ContentType = 'Revenues Post and Emails' }
+		'CS-BENS-01' { $ContentType = 'Benefits Post and Emails' }
+		'CS-BENS-02' { $ContentType = 'Appeals and Tribunals' }
+		'CS-NNDR-01' { $ContentType = 'NNDR Post and Emails' }
+		'CS-NNDR-02' { $ContentType = 'NNDR Records' } 
+		'CS-NNDR-03' { $ContentType = 'NNDR Overpayment Calculation' }
+		'CS-NNDR-04' { $ContentType = 'NNDR Completion Notice' }
+		'CS-NNDR-05' { $ContentType = 'NNDR Rating Change Letter' }
+		'CS-NNDR-06' { $ContentType = 'NNDR Section 44A Certificate And Application' }
+		'CS-NNDR-07' { $ContentType = 'NNDR Tax Certificate' }
+		'CS-NNDR-08' { $ContentType = 'NNDR Valuation Officer correspondence' }
+        default { }
+    }
+
+	switch ($DocLabelCode)
+    {
+		# NNDR Document mappings
+		'ZNAFDR'	{ $DocumentLabel = 'Application for Disc. Relief incomplete' }
+		'ZNAFDR' 	{ $DocumentLabel = 'Application Granted for Discretionary Re' }
+		'NDCOMP' 	{ $DocumentLabel = 'BANES completion notice' }
+		'ZNBANK' 	{ $DocumentLabel = 'Bank Details Letter' }
+		'NBID'		{ $DocumentLabel = 'BID DOCUMENT' }
+		'ZNDBIF' 	{ $DocumentLabel = 'Bid final letter' }
+		'ZNDRBI' 	{ $DocumentLabel = 'Bid first contact letter' }
+		'NDLETT' 	{ $DocumentLabel = 'Blank letter template' }
+		'ZNDCOA' 	{ $DocumentLabel = 'Change of Address' }
+		'NDCOM1' 	{ $DocumentLabel = 'Complaint Form' }
+		'NCOVO' 	{ $DocumentLabel = 'Corresp Passed to VO' }
+		'ZNDPYT' 	{ $DocumentLabel = 'Debit / Credit Card Payments' }
+		'NDRDEF' 	{ $DocumentLabel = 'Deferral Scheme Application form' }
+		'ZNRAVO' 	{ $DocumentLabel = 'Direct Ratepayer to Contact VO' }
+		'NDERF' 	{ $DocumentLabel = 'Disc Relief Application Refused' }
+		'NDDRRA' 	{ $DocumentLabel = 'Discretionary Rate Relief Application' }
+		'NDDRA' 	{ $DocumentLabel = 'Discretionary Relief Allowed' }
+		'NDREV' 	{ $DocumentLabel = 'Discretionary Relief Review' }
+		'ZNDRAT' 	{ $DocumentLabel = 'Do not use' }
+		'NDEXRQ' 	{ $DocumentLabel = 'Exemption Request' }
+		'ZNNFAR' 	{ $DocumentLabel = 'Farm Diversification Relief' }
+		'ZNFIGW' 	{ $DocumentLabel = 'Figures & Words don''t match on cheque' }
+		'ZNFALR' 	{ $DocumentLabel = 'Forwarding Address for Leaver''s Refund' }
+		'ZNDHOL' 	{ $DocumentLabel = 'Get docs out of NNDR holding tray' }
+		'NDHRA' 	{ $DocumentLabel = 'Hardship Relief Application' }
+		'ZNWRDA' 	{ $DocumentLabel = 'Incorrect date on cheque' }
+		'NIRLR' 	{ $DocumentLabel = 'Info Required from Leaving Ratepayer' }
+		'NDINSO' 	{ $DocumentLabel = 'Insolvency Information' }
+		'ZNDIME' 	{ $DocumentLabel = 'Internal Memo to Benefits' }
+		'ZNDIME' 	{ $DocumentLabel = 'Internal Memo to Council Tax' }
+		'ZNDIMN' 	{ $DocumentLabel = 'Internal Memo to Non-Domestic Rates' }
+		'NDMRRA' 	{ $DocumentLabel = 'Mandatory Rate Relief Application' }
+		'NDMAP' 	{ $DocumentLabel = 'Maps/Plans' }
+		'NDMISL' 	{ $DocumentLabel = 'Miscellaneous Letter' }
+		'ZMSPND' 	{ $DocumentLabel = 'Missing Payment Querys' }
+		'ZRNAWB' 	{ $DocumentLabel = 'N Awaiting Bailiff Action - COLD report' }
+		'ZNSUR' 	{ $DocumentLabel = 'N Do not use' }
+		'ZRNLAL' 	{ $DocumentLabel = 'N Local Arrangement List - COLD' }
+		'ZNBAC1' 	{ $DocumentLabel = 'N Recovery Backscan' }
+		'ZRNMEM' 	{ $DocumentLabel = 'N Recovery Internal Memo' }
+		'ZNDDIN' 	{ $DocumentLabel = 'ND DD Instalment notification' }
+		'ZBNNOB' 	{ $DocumentLabel = 'ND Notice of Bankruptcy Proceedings' }
+		'ZRNSTG' 	{ $DocumentLabel = 'ND Stage 1 Explanatory Letter' }
+		'BSLETN' 	{ $DocumentLabel = 'ND Substituted Service Letter' }
+		'ZDDRCL' 	{ $DocumentLabel = 'NDD Direct Debit  Recall List' }
+		'ZNNDAL' 	{ $DocumentLabel = 'NDD Direct Debit Amendment List' }
+		'NDDDM' 	{ $DocumentLabel = 'NDD Direct Debit Mandate' }
+		'ZNDRCO' 	{ $DocumentLabel = 'NDR Complaints Memo' }
+		'ZDWIND' 	{ $DocumentLabel = 'NDR compliment' }
+		'ZNDRWI' 	{ $DocumentLabel = 'NDR compliments memo' }
+		'NDRCR2' 	{ $DocumentLabel = 'NDR Credit to former ratepayer' }
+		'ZNDRHB' 	{ $DocumentLabel = 'NDR HBS error memo' }
+		'ZNDRCR' 	{ $DocumentLabel = 'NDR insolv/liquidation credit 3rd party' }
+		'ZNREC' 	{ $DocumentLabel = 'NDR No Receipt Letter' }
+		'ZNDTOU' 	{ $DocumentLabel = 'NDR Outgoing Telephone Memo' }
+		'NDRPBC' 	{ $DocumentLabel = 'NDR Planning/Building Control' }
+		'ZSMBUS' 	{ $DocumentLabel = 'NDR Small Business Rate Relief Memo' }
+		'ZNDRVD' 	{ $DocumentLabel = 'NDR Void Inspection Memo' }
+		'ZDNEWP' 	{ $DocumentLabel = 'New Property' }
+		'ZNDBIL' 	{ $DocumentLabel = 'NN BILL TEMPLATE' }
+		'ZNBILL' 	{ $DocumentLabel = 'NN Blank Bill' }
+		'NNENC' 	{ $DocumentLabel = 'NN Enclosure Ltr' }
+		'ZNNEXV' 	{ $DocumentLabel = 'NN External Visit' }
+		'ZDBACK' 	{ $DocumentLabel = 'NNDR backscan documents' }
+		'ZRNBSR' 	{ $DocumentLabel = 'NNDR Balififf returns' }
+		'ZNDCOM' 	{ $DocumentLabel = 'NNDR Counter Memo' }
+		'ZNDCUS' 	{ $DocumentLabel = 'NNDR Customer Visit Request' }
+		'ZNDDR1' 	{ $DocumentLabel = 'NNDR Direct Debit Recall 1st Time' }
+		'ZNDDDR' 	{ $DocumentLabel = 'NNDR Direct Debit Recall Second Month' }
+		'ZNNDRD' 	{ $DocumentLabel = 'NNDR Document Transfer Note' }
+		'NDEMA1' 	{ $DocumentLabel = 'NNDR E Mail' }
+		'ZNDEMA' 	{ $DocumentLabel = 'NNDR E-Mail' }
+		'NNENQ' 	{ $DocumentLabel = 'NNDR Enquiry Form' }
+		'ZNDENQ' 	{ $DocumentLabel = 'NNDR Enquiry Forms' }
+		'ZNDMON' 	{ $DocumentLabel = 'NNDR Monitoring Checklist' }
+		'ZNDRCA' 	{ $DocumentLabel = 'NNDR Moving In Memo' }
+		'ZNDRCA' 	{ $DocumentLabel = 'NNDR Moving Out Memo' }
+		'ZDNAFN' 	{ $DocumentLabel = 'NNDR NAFN Credit Search' }
+		'NNAFN' 	{ $DocumentLabel = 'NNDR NAFN Search' }
+		'NDRPC' 	{ $DocumentLabel = 'NNDR Payment Confirmation' }
+		'ZNRECS' 	{ $DocumentLabel = 'NNDR Recovery DD Confirmation Ltr' }
+		'ZNDR44' 	{ $DocumentLabel = 'NNDR Section 44A Visit request' }
+		'ZNRSPA' 	{ $DocumentLabel = 'NNDR Spa Recall 1' }
+		'ZNRSPA' 	{ $DocumentLabel = 'NNDR Spa Recall 2' }
+		'ZNDTEL' 	{ $DocumentLabel = 'NNDR Telephone Memo' }
+		'ZNNUNS' 	{ $DocumentLabel = 'NNDR Unsigned cheque' }
+		'ZNDCMU' 	{ $DocumentLabel = 'NNDR Urgent Counter Memo' }
+		'ZNDTMU' 	{ $DocumentLabel = 'NNDR Urgent Telephone Memo' }
+		'ZNDVI1' 	{ $DocumentLabel = 'NNDR Visit Request' }
+		'ZNDUNO' 	{ $DocumentLabel = 'NNDR void inspection follow up letter' }
+		'ZNNDRR' 	{ $DocumentLabel = 'NNDRR6' }
+		'NOPYMT' 	{ $DocumentLabel = 'Overpayment Calculation' }
+		'ZNPPA' 	{ $DocumentLabel = 'Payment Proposal Agreed' }
+		'ZNPPR' 	{ $DocumentLabel = 'Payment Proposal Refused' }
+		'ZNPOST' 	{ $DocumentLabel = 'Post-dated cheque' }
+		'NDVIS' 	{ $DocumentLabel = 'Property Visit Request' }
+		'RNADDA' 	{ $DocumentLabel = 'R ADDACS return ND' }
+		'RNAFA' 	{ $DocumentLabel = 'R Awaiting further action  COLD' }
+		'RNBSLA' 	{ $DocumentLabel = 'R B&S Lift Approval Notices' }
+		'RNBSPS' 	{ $DocumentLabel = 'R B&S Payment Schedules' }
+		'RNBSFI' 	{ $DocumentLabel = 'R B&S Request for Further Information' }
+		'RCOMMC' 	{ $DocumentLabel = 'R Comm Court docs' }
+		'RNLLPS' 	{ $DocumentLabel = 'R L&L Payment Schedules' }
+		'ZRNLON' 	{ $DocumentLabel = 'R Liability Order Notice' }
+		'RNAW' 		{ $DocumentLabel = 'R N Arrest Warrants' }
+		'RNFMEF' 	{ $DocumentLabel = 'R N Financial Means Enquiry Form' }
+		'RNHVF' 	{ $DocumentLabel = 'R N Home visit form' }
+		'RNFNL' 	{ $DocumentLabel = 'R N Returned Final Notices' }
+		'ZNDDEF' 	{ $DocumentLabel = 'Rate Deferral application granted' }
+		'NDDEF2' 	{ $DocumentLabel = 'Rate Deferral application refused' }
+		'ZNDDEF' 	{ $DocumentLabel = 'Rate Deferral application refussed' }
+		'NDDEF2' 	{ $DocumentLabel = 'Rate referral application refused' }
+		'NDRATC' 	{ $DocumentLabel = 'Rating Change Letter' }
+		'ZCALBA' 	{ $DocumentLabel = 'Recovery Call Back Memo' }
+		'NR16' 		{ $DocumentLabel = 'Recovery NNDR Alternative offer' }
+		'RNBACK' 	{ $DocumentLabel = 'Recovery NNDR Backscan documents' }
+		'NDRBS1' 	{ $DocumentLabel = 'Recovery NNDR Banckruptcy Stage 1' }
+		'RNCM12' 	{ $DocumentLabel = 'Recovery NNDR Committal notice' }
+		'R7' 		{ $DocumentLabel = 'Recovery NNDR Costs Letter' }
+		'RNFA24' 	{ $DocumentLabel = 'Recovery NNDR Failure to maintain pyt ar' }
+		'NFME2' 	{ $DocumentLabel = 'Recovery NNDR Financial Means Enquiry' }
+		'SHEWC' 	{ $DocumentLabel = 'Recovery NNDR Shew Cause Letter' }
+		'RNOL25' 	{ $DocumentLabel = 'Recovery Notice of intended bailiff act' }
+		'NDRTMA' 	{ $DocumentLabel = 'Returned Mail' }
+		'NDRRFI' 	{ $DocumentLabel = 'Returned Request For Information' }
+		'RNTRAC' 	{ $DocumentLabel = 'RN Centrethorn trace form' }
+		'ZNS49D' 	{ $DocumentLabel = 'S49 Hardship - Appl Deferred' }
+		'ZNS49G' 	{ $DocumentLabel = 'S49 Hardship - Granted' }
+		'ZS49I' 	{ $DocumentLabel = 'S49 Hardship - Incomplete' }
+		'ZNS49R' 	{ $DocumentLabel = 'S49 Hardship - Refused' }
+		'ZNDSBR' 	{ $DocumentLabel = 'SBRR Application Form' }
+		'NDS44A' 	{ $DocumentLabel = 'Section 44A Application' }
+		'NDS44C' 	{ $DocumentLabel = 'Section 44A Certificate' }
+		'NSS4A' 	{ $DocumentLabel = 'Section 44a Certificate' }
+		'ZSSSUR' 	{ $DocumentLabel = 'Shared Service Customer Survey' }
+		'NDRRR' 	{ $DocumentLabel = 'Small Business Rate Relief Application' }
+		'SMBUSL' 	{ $DocumentLabel = 'Small Business Rate Relief Letter' }
+		'ZNDSUR' 	{ $DocumentLabel = 'Survey form enclosure - NNDR' }
+		'ZRNSUR' 	{ $DocumentLabel = 'Survey form enclosure - Recovery' }
+		'NTAXC' 	{ $DocumentLabel = 'Tax Certificate' }
+		'NDVOC' 	{ $DocumentLabel = 'Valuation Officer Correspondence' }
+		'VNNVD' 	{ $DocumentLabel = 'Visiting NNDR void' }
+		'NRETAI' 	{ $DocumentLabel = 'Retail Rate Relief Incoming form' }
+		
+		# Revenues document mappings
+		'Z2NDHC' 	{ $DocumentLabel = '2nd Home Discount Review - Complete' }
+		'R16' 		{ $DocumentLabel = 'Alternative Offer' }
+		'ZABCC' 	{ $DocumentLabel = 'Annual Billing Change of Circs' }
+		'R11' 		{ $DocumentLabel = 'AOE Ceased Customer' }
+		'RAOE03' 	{ $DocumentLabel = 'Attachment of Earnings Customer' }
+		'RAOE04' 	{ $DocumentLabel = 'Attachment of Earnings Employer' }
+		'ZBSTR' 	{ $DocumentLabel = 'B & S Trace Request' }
+		'ZBANIN' 	{ $DocumentLabel = 'Bankruptcy Proceedings Instalments' }
+		'ZBS1' 		{ $DocumentLabel = 'Bankruptcy Stage 1' }
+		'RCSTG1' 	{ $DocumentLabel = 'Bankruptcy Stage one' }
+		'BSSLET' 	{ $DocumentLabel = 'Bankruptcy stat demand service' }
+		'ZCTSTM' 	{ $DocumentLabel = 'Bath Spa/Uni notification memo' }
+		'ZCTSTR'	{ $DocumentLabel = 'Bath Uni/Spa Registration request' }
+		'ZCTHBA' 	{ $DocumentLabel = 'Benefit form enclosure letter' }
+		'ZHBINI' 	{ $DocumentLabel = 'Benefits Initial Claim form' }
+		'CLETT' 	{ $DocumentLabel = 'Blank Letter Template' }
+		'ZCSUR1' 	{ $DocumentLabel = 'C Do not use' }
+		'ZRCBAC' 	{ $DocumentLabel = 'C Recovery Backscan' }
+		'ZRCMEM' 	{ $DocumentLabel = 'C Recovery internal memo (Int)' }
+		'ZDISRF' 	{ $DocumentLabel = 'C Tax 2nd Home/Empty Enquiry Form' }
+		'ZCTREC' 	{ $DocumentLabel = 'C/Tax No Receipt Letter' }
+		'RISD10' 	{ $DocumentLabel = 'Cancellationof IS/JSA deds (not in payt)' }
+		'ZCASH' 	{ $DocumentLabel = 'Cash payers' }
+		'ZCASH' 	{ $DocumentLabel = 'Cash payment' }
+		'ZTCCMI' 	{ $DocumentLabel = 'CC Moving In email' }
+		'ZTCCMO' 	{ $DocumentLabel = 'CC Moving Out email' }
+		'CTOCC' 	{ $DocumentLabel = 'Change of Address/Occupier' }
+		'ZRCOEX' 	{ $DocumentLabel = 'COLD Exors List' }
+		'ZCOMUL' 	{ $DocumentLabel = 'COLD Multiple Liability Order Report' }
+		'ZRCCOL' 	{ $DocumentLabel = 'COLD Post summons progress report' }
+		'ZCRCT' 	{ $DocumentLabel = 'Cold Report C/Tax  Recalc' }
+		'ZRCCOS' 	{ $DocumentLabel = 'COLD Special Arrangements' }
+		'ZCSUMM' 	{ $DocumentLabel = 'COLD Summons Complaints List' }
+		'CTCPLT' 	{ $DocumentLabel = 'Complaint Letter' }
+		'CTCOND' 	{ $DocumentLabel = 'Condolence Letter' }
+		'CTDECD' 	{ $DocumentLabel = 'Correspondence Re Decd Persons' }
+		'R71' 		{ $DocumentLabel = 'Costs Letter' }
+		'ZCCSTU' 	{ $DocumentLabel = 'Council Connect Student Email' }
+		'ZCTCAL' 	{ $DocumentLabel = 'Council Tax call back memo' }
+		'ZTLIAB' 	{ $DocumentLabel = 'Council Tax change in liable person' }
+		'ZCTCO' 	{ $DocumentLabel = 'Council Tax Complaints Memo' }
+		'ZTCNOI' 	{ $DocumentLabel = 'Council Tax Completion Notice Incoming' }
+		'ZTCONO' 	{ $DocumentLabel = 'Council Tax Completion Notice Outgoing' }
+		'ZTWIND' 	{ $DocumentLabel = 'Council Tax compliment' }
+		'ZCTWIN' 	{ $DocumentLabel = 'Council Tax Compliments Memo' }
+		'ZCTCVI' 	{ $DocumentLabel = 'Council Tax Customer Visit Request' }
+		'ZCTDDD' 	{ $DocumentLabel = 'Council Tax direct debit details' }
+		'CTDECL' 	{ $DocumentLabel = 'Council Tax Executors/Solicitors Letter' }
+		'ZCTVIS' 	{ $DocumentLabel = 'Council Tax Extended Visit Request' }
+		'ZCTHBS' 	{ $DocumentLabel = 'Council Tax HBS Error Memo' }
+		'ZTININ' 	{ $DocumentLabel = 'Council Tax information request return' }
+		'CTBINC' 	{ $DocumentLabel = 'Council Tax Investigation Closure' }
+		'ZCTMON' 	{ $DocumentLabel = 'Council Tax Monitoring Checklist' }
+		'ZCTMOM' 	{ $DocumentLabel = 'Council tax Moving out memo' }
+		'CTNWPR' 	{ $DocumentLabel = 'Council Tax New Property Memo' }
+		'CTPBC' 	{ $DocumentLabel = 'Council Tax Planning/Building Control' }
+		'CTPOD' 	{ $DocumentLabel = 'Council Tax Proof of Debt' }
+		'ZCTRBS' 	{ $DocumentLabel = 'Council Tax RBS Errors' }
+		'ZCTCOS' 	{ $DocumentLabel = 'Council Tax Student Moving In Memo' }
+		'ZCTCSM' 	{ $DocumentLabel = 'Council Tax Student Moving Out Memo' }
+		'ZCTTEL' 	{ $DocumentLabel = 'Council Tax Telephone Memo' }
+		'ZCTVIS' 	{ $DocumentLabel = 'Council Tax Visit Request' }
+		'ZCTVDM' 	{ $DocumentLabel = 'Council Tax Void Inspection Memo' }
+		'ZTVOID' 	{ $DocumentLabel = 'Council Tax Void List' }
+		'ZCTPYT' 	{ $DocumentLabel = 'Credit / Debit card payment memo' }
+		'ZCTCRBI' 	{ $DocumentLabel = 'Credit Bill' }
+		'ZCTCRP' 	{ $DocumentLabel = 'Credit Card Problems' }
+		'ZCTEXV' 	{ $DocumentLabel = 'CT External Visit' }
+		'ZBCNOB' 	{ $DocumentLabel = 'CT Notice of Bankruptcy Proceedings' }
+		'ZTPETD' 	{ $DocumentLabel = 'CT Permission to Discuss' }
+		'ZCTREG' 	{ $DocumentLabel = 'CT Request for Student Registration' }
+		'ZCTBMO' 	{ $DocumentLabel = 'Ctax - Benefits moving in/out memo' }
+		'ZCTCOA' 	{ $DocumentLabel = 'Ctax Change of Address Memo - Moving In' }
+		'ZCTCOM' 	{ $DocumentLabel = 'Ctax Counter Memo' }
+		'ZCTAXD' 	{ $DocumentLabel = 'CTAX Document Transfer Note' }
+		'CEMAIL' 	{ $DocumentLabel = 'Ctax E Mail' }
+		'ZTEIFM' 	{ $DocumentLabel = 'CTax Extra Instalment Form - incoming' }
+		'ZCTEIF' 	{ $DocumentLabel = 'CTax Extra Instalment Form - Outgoing' }
+		'CTDDRQ' 	{ $DocumentLabel = 'CTax form enclosure letter' }
+		'CTBINP' 	{ $DocumentLabel = 'Ctax Investigation Progress Report' }
+		'ZTSTHC' 	{ $DocumentLabel = 'CTax Student House complete' }
+		'ZTST09' 	{ $DocumentLabel = 'Ctax Student Moving Out Memo' }
+		'ZCTCMU' 	{ $DocumentLabel = 'Ctax Urgent Counter Memo' }
+		'ZCTTMU' 	{ $DocumentLabel = 'Ctax Urgent Telephone Memo' }
+		'BANFUL' 	{ $DocumentLabel = 'Customer bankruptcy advice' }
+		'ZDDUNA' 	{ $DocumentLabel = 'D/D Unab to Process' }
+		'ZRDDSU' 	{ $DocumentLabel = 'DD Summons Letter' }
+		'RDNR19' 	{ $DocumentLabel = 'Deductions from IS/JSA /ESA not required' }
+		'RBADED' 	{ $DocumentLabel = 'Deductions from IS/JSA/ESA' }
+		'PENDED' 	{ $DocumentLabel = 'Deductions from Pension Credit' }
+		'RDNR20' 	{ $DocumentLabel = 'Deductions from pension credit not req' }
+		'PENDED' 	{ $DocumentLabel = 'Deductions from Pension Credits' }
+		'ZCTDDA' 	{ $DocumentLabel = 'Direct Debit Amendment List' }
+		'ZCDDER' 	{ $DocumentLabel = 'Direct Debit Arrears Due To Error' }
+		'ZTDDLT' 	{ $DocumentLabel = 'Direct Debit Correspondence' }
+		'ZCTDDM' 	{ $DocumentLabel = 'Direct Debit Mandate' }
+		'ZCTDDR' 	{ $DocumentLabel = 'Direct Debit Recall 1' }
+		'ZCTDDR' 	{ $DocumentLabel = 'Direct Debit Recall List' }
+		'ZCTDDR' 	{ $DocumentLabel = 'Direct Debit Recalled for Second Month' }
+		'ZCDISB' 	{ $DocumentLabel = 'Disability Band Reduction Refused' }
+		'ZCDSBN' 	{ $DocumentLabel = 'Disabled Band Reduction Successful' }
+		'ZTDIRD' 	{ $DocumentLabel = 'Disabled Reduction App Form' }
+		'ZTDIEX' 	{ $DocumentLabel = 'Discount/Exemption App Form' }
+		'ZTENQF' 	{ $DocumentLabel = 'Enquiry Form' }
+		'R13' 		{ $DocumentLabel = 'Exors Arrears Letter (Int)' }
+		'RCFA24' 	{ $DocumentLabel = 'Failure to maintain pyt arrangment' }
+		'ZFIGWO' 	{ $DocumentLabel = 'Figures & Words not matched on cheque' }
+		'CTFARE' 	{ $DocumentLabel = 'Forwarding Address Request' }
+		'ZCTHOL' 	{ $DocumentLabel = 'Get docs out of Ctax holding tray' }
+		'CHMOLL' 	{ $DocumentLabel = 'HMO letter' }
+		'ZCTIVR' 	{ $DocumentLabel = 'Income Visit Request Ctax' }
+		'ZCTINSL' 	{ $DocumentLabel = 'Insolvency/Bankruptcy/Admin Order Info' }
+		'ZCINRE' 	{ $DocumentLabel = 'Inspector''s Request' }
+		'CTDDIN' 	{ $DocumentLabel = 'Instalment notification' }
+		'ZCTMEM' 	{ $DocumentLabel = 'Internal memo to Benefits' }
+		'ZCTMEM' 	{ $DocumentLabel = 'Internal memo to Ctax holding' }
+		'ZCTMEM' 	{ $DocumentLabel = 'Internal memo to recovery' }
+		'CJOICR' 	{ $DocumentLabel = 'Joint Credit' }
+		'ZLLRET' 	{ $DocumentLabel = 'L&L RET' }
+		'LASTDA' 	{ $DocumentLabel = 'Last Day Liability' }
+		'CTLIA1' 	{ $DocumentLabel = 'Liability Query' }
+		'ZRFADD' 	{ $DocumentLabel = 'LL Forwarding Address Request' }
+		'CMISC' 	{ $DocumentLabel = 'Miscellaneous Council Tax Letter' }
+		'ZMISPA' 	{ $DocumentLabel = 'Missing Payment Query' }
+		'ZNAFN' 	{ $DocumentLabel = 'NAFN Credit Search' }
+		'CTNPM' 	{ $DocumentLabel = 'New Property Memo' }
+		'ZTPROP' 	{ $DocumentLabel = 'New Property/Change of Use of Property' }
+		'ZFIREV' 	{ $DocumentLabel = 'NFI SPD Review' }
+		'RCOM12' 	{ $DocumentLabel = 'Notice of Impending Committal (Int)' }
+		'RNOIBA' 	{ $DocumentLabel = 'Notice of Intended Enforcement Action' }
+		'ZCTDED' 	{ $DocumentLabel = 'Notification of Death Memo' }
+		'ZCTPCR' 	{ $DocumentLabel = 'Payment card request' }
+		'ZCTPAY' 	{ $DocumentLabel = 'Payment Query/Arrangement' }
+		'ZPOSTD' 	{ $DocumentLabel = 'Postdated cheque' }
+		'ZRCSDL' 	{ $DocumentLabel = 'R 7 Day Letter' }
+		'ZADDAC' 	{ $DocumentLabel = 'R ADDACS returns' }
+		'ZRCAW' 	{ $DocumentLabel = 'R Arrest Warrants' }
+		'ZRAOED' 	{ $DocumentLabel = 'R Attachment of Earnings Documents (New)' }
+		'ZCEARN' 	{ $DocumentLabel = 'R Attachment of Earnings documents(New)' }
+		'ZRCBSR' 	{ $DocumentLabel = 'R B/F Bailiff Returns' }
+		'ZRCBSL'	{ $DocumentLabel = 'R B/F Lift Approval Notices' }
+		'ZRCBSP' 	{ $DocumentLabel = 'R B/F Payment Schedules' }
+		'ZRCBSF' 	{ $DocumentLabel = 'R B/F Request for Further Information' }
+		'RCBAI' 	{ $DocumentLabel = 'R Bailiff Documents (New)' }
+		'RBANKD' 	{ $DocumentLabel = 'R Bankruptcy docs' }
+		'ZRCAOC' 	{ $DocumentLabel = 'R Blues (Arrears of CTax)' }
+		'RCHARG' 	{ $DocumentLabel = 'R Charging Order docs' }
+		'ZRCCAB' 	{ $DocumentLabel = 'R Citizens Advice Bureau' }
+		'RCCOU' 	{ $DocumentLabel = 'R Court Documents (New)' }
+		'ZRCDWP' 	{ $DocumentLabel = 'R D.W.P Documents (New)' }
+		'ZRDDC' 	{ $DocumentLabel = 'R Direct Debit Corresp (New)' }
+		'ZRCDD' 	{ $DocumentLabel = 'R Direct Debit Form(recovery)' }
+		'ZRCBA1' 	{ $DocumentLabel = 'R Direct Debit Returned (BACS List)' }
+		'ZRCDS1' 	{ $DocumentLabel = 'R DSS Payment Schedule' }
+		'ZRCDSS' 	{ $DocumentLabel = 'R DSS Returns' }
+		'ZRCEXV' 	{ $DocumentLabel = 'R external visit request form' }
+		'ZRCFAX' 	{ $DocumentLabel = 'R Fax' }
+		'ZRCFME' 	{ $DocumentLabel = 'R Financial Means Enquiry Form' }
+		'RCFID' 	{ $DocumentLabel = 'R Further Information Docs (New)' }
+		'ZRCHVF' 	{ $DocumentLabel = 'R Home Visit Form' }
+		'ZRCLOD' 	{ $DocumentLabel = 'R Liability Order Documents (New)' }
+		'ZRCMS' 	{ $DocumentLabel = 'R Means Summonses' }
+		'RMISC' 	{ $DocumentLabel = 'R Miscellaneous Docs (New)' }
+		'ZRMISC' 	{ $DocumentLabel = 'R Miscellaneous Recovery Letter' }
+		'ZNAFN' 	{ $DocumentLabel = 'R NAFN Credit Search' }
+		'ZRRFPA' 	{ $DocumentLabel = 'R Recovery request for payment arrangeme' }
+		'ZRCFNL' 	{ $DocumentLabel = 'R Returned Final Notices' }
+		'ZRRET' 	{ $DocumentLabel = 'R Returned Mail' }
+		'ZTNAFN' 	{ $DocumentLabel = 'R Returned NAFN Search' }
+		'ZRCRMD' 	{ $DocumentLabel = 'R Returned Reminder Notices' }
+		'ZRCRTD' 	{ $DocumentLabel = 'R RTD Summons' }
+		'ZRCTE' 	{ $DocumentLabel = 'R RTD Tracing Enquiries' }
+		'ZR14' 		{ $DocumentLabel = 'R14 Returned Cheque (Int)' }
+		'ZR15' 		{ $DocumentLabel = 'R15 Summons Cancellation (Int)' }
+		'ZRCOA2' 	{ $DocumentLabel = 'R22 Confirmation of Arrangement (Int)' }
+		'ZRCU23' 	{ $DocumentLabel = 'R23 Unacceptable Arrangement Offer (Int)' }
+		'ZRCOL2' 	{ $DocumentLabel = 'R25 Notice of O/S Balance on LO (Int)' }
+		'ZR6' 		{ $DocumentLabel = 'R6 Payment of Arrears (Int)' }
+		'ZR8' 		{ $DocumentLabel = 'R8 AOE Cancellation (Int)' }
+		'ZR9' 		{ $DocumentLabel = 'R9 AOE Renewal (Int)' }
+		'ZRCTRA' 	{ $DocumentLabel = 'RC Centrthorn trace form (Int)' }
+		'ZRFINI' 	{ $DocumentLabel = 'Reason for Final Issue' }
+		'ZCALBA' 	{ $DocumentLabel = 'Recovery call back memo' }
+		'ZRECSU' 	{ $DocumentLabel = 'Recovery D/D Confirmation Letter' }
+		'ZRDDIC' 	{ $DocumentLabel = 'Recovery DD instruction cancelled' }
+		'ZCEMAI' 	{ $DocumentLabel = 'RECOVERY E MAIL' }
+		'RFME' 		{ $DocumentLabel = 'Recovery Financial Means Enquiry Letter' }
+		'ZREMON' 	{ $DocumentLabel = 'Recovery Monitoring Checklist' }
+		'ZRSTF' 	{ $DocumentLabel = 'Recovery Standard Final Letter' }
+		'ZRSTR' 	{ $DocumentLabel = 'Recovery Standard Reminder Letter' }
+		'ZWOFFC' 	{ $DocumentLabel = 'Recovery Write off checklist' }
+		'CTREF' 	{ $DocumentLabel = 'Referral from Assessment' }
+		'ZTREFN' 	{ $DocumentLabel = 'Refund/Transfer Request' }
+		'ZTINFO' 	{ $DocumentLabel = 'Request For Info/Reply To Info Request' }
+		'ZRREDP' 	{ $DocumentLabel = 'Request under DPA' }
+		'ZCTVSP' 	{ $DocumentLabel = 'Result of SPD Visit' }
+		'ZETCHQ' 	{ $DocumentLabel = 'Returned Cheque' }
+		'ZCTLRS' 	{ $DocumentLabel = 'Returned Land Registry search' }
+		'ZTUNOP' 	{ $DocumentLabel = 'Returned Mail/Unopened Envelopes' }
+		'ZTNARE' 	{ $DocumentLabel = 'Returned NAFN' }
+		'ZRCRET' 	{ $DocumentLabel = 'Returned Reminder/Final Notice' }
+		'ZCR18' 	{ $DocumentLabel = 'Rising 18s' }
+		'Z2NDHR' 	{ $DocumentLabel = 'Second Home Review Form' }
+		'ZSELFS' 	{ $DocumentLabel = 'Self Serve Not Authorised Letter' }
+		'ZTSMII' 	{ $DocumentLabel = 'Severely mentally impaired form incoming' }
+		'CTSMIO' 	{ $DocumentLabel = 'Severely mentally impaired outgoing' }
+		'SHEW1' 	{ $DocumentLabel = 'Shew Cause Letter' }
+		'ZTSPDC' 	{ $DocumentLabel = 'Single Person Discount form - changes' }
+		'ZCTSPD' 	{ $DocumentLabel = 'Single Person Discount form - Outgoing' }
+		'ZTSPDR' 	{ $DocumentLabel = 'Single Person Discount Review - Complete' }
+		'ZSPDBE' 	{ $DocumentLabel = 'Single person discount review 2 benefits' }
+		'ZTSPDI' 	{ $DocumentLabel = 'Single Person Disount form -  incoming' }
+		'ZRSPAD' 	{ $DocumentLabel = 'SPA Recall 1' }
+		'ZRSPAD' 	{ $DocumentLabel = 'SPA Recall 2' }
+		'ZCTSO' 	{ $DocumentLabel = 'Standing Order' }
+		'ZCTSTF' 	{ $DocumentLabel = 'Student - Final Letter' }
+		'ZTST07' 	{ $DocumentLabel = 'Student 07/08' }
+		'ZCTSM0' 	{ $DocumentLabel = 'Student 10 11' }
+		'ZCTSTU' 	{ $DocumentLabel = 'Student Certificate' }
+		'CSTUC' 	{ $DocumentLabel = 'Student Certificate Request' }
+		'ZTSTCL' 	{ $DocumentLabel = 'Student Closing Form' }
+		'ZTSTUD' 	{ $DocumentLabel = 'Student disregard' }
+		'ZTSTEX' 	{ $DocumentLabel = 'Student Exemption Form' }
+		'ZCTSTE' 	{ $DocumentLabel = 'Student incoming e-mail' }
+		'ZCTSTL' 	{ $DocumentLabel = 'Student Landlord Letter' }
+		'ZTSTLL' 	{ $DocumentLabel = 'Student Landlord properties' }
+		'ZTSTUL' 	{ $DocumentLabel = 'Student Letting Information' }
+		'ZCTSTR' 	{ $DocumentLabel = 'Student Registration' }
+		'ZCTSM7' 	{ $DocumentLabel = 'Student Validation 10/11' }
+		'ZCTSUR' 	{ $DocumentLabel = 'Survey form enclosure letter - ctax' }
+		'ZRCSUR' 	{ $DocumentLabel = 'Survey form enclosure letter - Recovery' }
+		'ZCTENL' 	{ $DocumentLabel = 'Tenants Liable' }
+		'ZNUNSI' 	{ $DocumentLabel = 'Unsigned Cheque' }
+		'ZTBMEM' 	{ $DocumentLabel = 'Urgent Benefit Internal Memo to Ctax' }
+		'ZTBMEM' 	{ $DocumentLabel = 'Urgent Benefit memo to Ctax' }
+		'ZCTUME' 	{ $DocumentLabel = 'Urgent Benefits internal memo to C/TAX' }
+		'ZREMEM' 	{ $DocumentLabel = 'Urgent Recovery Memo to Council Tax' }
+		'ZOFFCL' 	{ $DocumentLabel = 'Write off checklist' }
+		'ZWRDAT' 	{ $DocumentLabel = 'Wrong date on cheque' }
+		'ZZLEAN' 	{ $DocumentLabel = 'ZZLean Review moving in/out m' }
+		
+		# Bens 
+		'ZHBCAL' 	{ $DocumentLabel = '********HB Calculation/Decision********' }
+		'ZBLEA1' 	{ $DocumentLabel = '***LEAN***REVIEW***CASE' }
+		'ZHBLEA' 	{ $DocumentLabel = '***LEAN***REVIEW***CASE***' }
+		'HBREF' 	{ $DocumentLabel = '+++++Referral from assessment+++++' }
+		'ZHB2AR' 	{ $DocumentLabel = '2AR Form Incoming' }
+		'HB2WCN' 	{ $DocumentLabel = 'A 2 Week Rem' }
+		'ZHB2WR' 	{ $DocumentLabel = 'A 2 Week Rem , claim not renewed' }
+		'ZHB2WN' 	{ $DocumentLabel = 'A 2 Week Rem,  no further action' }
+		'ZHB2AR' 	{ $DocumentLabel = 'A 2AR Application' }
+		'ZHBV3M' 	{ $DocumentLabel = 'A 3 Mnth Unsucessful Visit' }
+		'HBV3M2' 	{ $DocumentLabel = 'A 3 Mnth Visit 2nd Appointment' }
+		'HBV3M' 	{ $DocumentLabel = 'A 3 Mnth Visit Appointment' }
+		'ZHBAB1' 	{ $DocumentLabel = 'Annul Bill 2014 incorrect' }
+		'ZHBAPT' 	{ $DocumentLabel = 'App for pre-tenancy determination' }
+		'ZHBARB' 	{ $DocumentLabel = 'App for Replacement Benefit Cheque' }
+		'ZB2HOM' 	{ $DocumentLabel = 'App. for benefit at 2 homes' }
+		'ZHBADM' 	{ $DocumentLabel = 'Appeal duly made info 2 wks' }
+		'ZHBAPP' 	{ $DocumentLabel = 'Appeal Late' }
+		'ZHBAND' 	{ $DocumentLabel = 'Appeal not duly made' }
+		'ZHBAPO' 	{ $DocumentLabel = 'Appeal out of jurisdiction' }
+		'HBAPTP' 	{ $DocumentLabel = 'Appeal Tribunal Papers' }
+		'APPE' 		{ $DocumentLabel = 'Appeals enclosure letter' }
+		'HBAPSE' 	{ $DocumentLabel = 'Appeals Service correspondence' }
+		'ZHBAPT' 	{ $DocumentLabel = 'Appeals tribunal papers' }
+		'HBAPLD' 	{ $DocumentLabel = 'Authority to pay Landlord Direct' }
+		'ZBPCCA' 	{ $DocumentLabel = 'B A Pensioner Credit Cancellation' }
+		'ZHBPCIC' 	{ $DocumentLabel = 'B A Pensioner Credit Change in Circs' }
+		'ZBPCDN' 	{ $DocumentLabel = 'B A Pensioner Credit Decision Notice' }
+		'ZHBBKD' 	{ $DocumentLabel = 'Backdate decision' }
+		'HBBARF' 	{ $DocumentLabel = 'Backdate refusal' }
+		'Z611' 		{ $DocumentLabel = 'Backdate Refusal (wizard)' }
+		'ZHBBRE' 	{ $DocumentLabel = 'Barcoded Renewal Form' }
+		'HBACK' 	{ $DocumentLabel = 'Benefit Acknowledgement letter' }
+		'ZBBADC' 	{ $DocumentLabel = 'Benefit Agency Decision Notice' }
+		'ZBBACA' 	{ $DocumentLabel = 'Benefit Agency IS/JSA cancellation' }
+		'ZBBACI' 	{ $DocumentLabel = 'Benefit Agency IS/JSA CIC' }
+		'HBBACK' 	{ $DocumentLabel = 'Benefit Backdating request' }
+		'ZHB1' 		{ $DocumentLabel = 'Benefit Backscan' }
+		'HBCIC' 	{ $DocumentLabel = 'Benefit Change in Circumstances' }
+		'ZHBLIA' 	{ $DocumentLabel = 'Benefit greater than liability memo' }
+		'ZBBOMC' 	{ $DocumentLabel = 'Benefit Officer Monitoring Checklist' }
+		'ZHBRAT' 	{ $DocumentLabel = 'Benefit RAT enquiry' }
+		'ZHBREN' 	{ $DocumentLabel = 'Benefit Renewal Form (do not use)' }
+		'ZHBSUS' 	{ $DocumentLabel = 'Benefit suspended at indexing' }
+		'HBSUSP' 	{ $DocumentLabel = 'Benefit suspended awaiting info' }
+		'HBAPPE' 	{ $DocumentLabel = 'Benefits Appeal' }
+		'HBAF' 		{ $DocumentLabel = 'Benefits Application Form' }
+		'BED' 		{ $DocumentLabel = 'Benefits Bedroom Tax Appeal' }
+		'ZBENCA' 	{ $DocumentLabel = 'Benefits Call Back Memo' }
+		'HBCICF' 	{ $DocumentLabel = 'Benefits change in circumstances form' }
+		'HBCOAF' 	{ $DocumentLabel = 'Benefits change of address' }
+		'HBCOMP' 	{ $DocumentLabel = 'Benefits Complaint' }
+		'HBWIND' 	{ $DocumentLabel = 'Benefits compliment' }
+		'ZHBCOM' 	{ $DocumentLabel = 'Benefits Counter Memo' }
+		'ZHBCV' 	{ $DocumentLabel = 'Benefits Customer Visit Request' }
+		'HBDHPB' 	{ $DocumentLabel = 'Benefits DHP Request' }
+		'ZDHPU' 	{ $DocumentLabel = 'Benefits DHP request under-occupancy' }
+		'ZHBDIE' 	{ $DocumentLabel = 'Benefits Diary Event Report' }
+		'ZBEMAL' 	{ $DocumentLabel = 'Benefits E Mail' }
+		'ZBEMPC' 	{ $DocumentLabel = 'Benefits Employers Certificate' }
+		'ZHBHBS' 	{ $DocumentLabel = 'Benefits HBS Error Memo' }
+		'ZBHPAF' 	{ $DocumentLabel = 'Benefits High Priority Application Form' }
+		'ZBHPHC' 	{ $DocumentLabel = 'Benefits High Priority Homeless Case' }
+		'HBINLE' 	{ $DocumentLabel = 'Benefits incoming letter' }
+		'ZHBIRM' 	{ $DocumentLabel = 'Benefits Info Request Memo' }
+		'ZBININ' 	{ $DocumentLabel = 'Benefits Information request return' }
+		'HBINIT' 	{ $DocumentLabel = 'Benefits Initial Claim Form' }
+		'ZBIMEM' 	{ $DocumentLabel = 'Benefits Internal Memo' }
+		'ZHBIVS' 	{ $DocumentLabel = 'Benefits Intervention/Suspension letter' }
+		'ZHBIVM' 	{ $DocumentLabel = 'Benefits Interventions Memo' }
+		'HBIC' 		{ $DocumentLabel = 'Benefits Investigation Closure' }
+		'ZHBMOV' 	{ $DocumentLabel = 'Benefits moving in/out memo' }
+		'ZHBNOD' 	{ $DocumentLabel = 'Benefits no decision, info not provided' }
+		'ZHBOPP' 	{ $DocumentLabel = 'Benefits OP Summary Proforma' }
+		'ZHBOPR' 	{ $DocumentLabel = 'Benefits Overpayment Recovery Proforma' }
+		'ZHBPRE' 	{ $DocumentLabel = 'Benefits Pre Assessment Checklist' }
+		'ZHBRBS' 	{ $DocumentLabel = 'Benefits RBS Errors memo' }
+		'ZHABTE' 	{ $DocumentLabel = 'Benefits Telephone Memo' }
+		'HBVAL1' 	{ $DocumentLabel = 'Benefits Visit Appointment Letter' }
+		'ZHBVEF' 	{ $DocumentLabel = 'Benefits Visit Reply Memo - Effective' }
+		'ZHBVNE' 	{ $DocumentLabel = 'Benefits Visit Reply Memo - Non Effectiv' }
+		'ZHBVIS' 	{ $DocumentLabel = 'Benefits Visit Request' }
+		'ZBCCHQ' 	{ $DocumentLabel = 'Cancelled Housing Benefit cheques' }
+		'ZBCCCO' 	{ $DocumentLabel = 'CC Bens COA' }
+		'ZBCCFR' 	{ $DocumentLabel = 'CC Bens Form Request' }
+		'HBCOE' 	{ $DocumentLabel = 'Certificate of Earnings' }
+		'ZBCBCH' 	{ $DocumentLabel = 'Child Benefit Check' }
+		'ZISPRO' 	{ $DocumentLabel = 'CIS prompts' }
+		'ZBCOOP' 	{ $DocumentLabel = 'Cold - Outstanding Overpayments' }
+		'HBCROP' 	{ $DocumentLabel = 'Cold OP''s recovery set to N' }
+		'ZHBCOL' 	{ $DocumentLabel = 'COLD report' }
+		'ZBCRDE' 	{ $DocumentLabel = 'Cold Report Diary Event' }
+		'ZHBCRD' 	{ $DocumentLabel = 'cold report DWP data match' }
+		'ZHBCRH' 	{ $DocumentLabel = 'Cold Report Hospitalisation' }
+		'ZBCRIC' 	{ $DocumentLabel = 'Cold Report Incomplete Claim' }
+		'ZBOPCN' 	{ $DocumentLabel = 'Cold Report Overpayment on Cancelled Clm' }
+		'ZHBCRP' 	{ $DocumentLabel = 'Cold Report Postal Review' }
+		'ZBCRRR' 	{ $DocumentLabel = 'Cold Report Rent Officer Referral' }
+		'ZHBCRO' 	{ $DocumentLabel = 'Cold Report Rent Officer Referrals' }
+		'ZBCRED' 	{ $DocumentLabel = 'Cold report safe code errors' }
+		'ZBCRSB' 	{ $DocumentLabel = 'Cold Report Significant Birthday' }
+		'ZBCRSC' 	{ $DocumentLabel = 'Cold Report Suspended Claim' }
+		'ZHBLCS' 	{ $DocumentLabel = 'Cold suppressed letters' }
+		'ZCOMPL' 	{ $DocumentLabel = 'Compliance LTAHAW/CP' }
+		'COMPLS' 	{ $DocumentLabel = 'Compliance Statement' }
+		'COMPL1' 	{ $DocumentLabel = 'Compliance Visit Letter 1' }
+		'ZCOMPL' 	{ $DocumentLabel = 'Compliance Visit Letter 2' }
+		'HBVCOM' 	{ $DocumentLabel = 'Compliance Visiting Memo' }
+		'HBCCA' 	{ $DocumentLabel = 'County Court Action' }
+		'ZHBCSF' 	{ $DocumentLabel = 'Customer Services Fraud Referral Form' }
+		'HBLETE' 	{ $DocumentLabel = 'Date of first contact telephone memo' }
+		'ZHBOPD' 	{ $DocumentLabel = 'Deceased OP letter' }
+		'HBDETC' 	{ $DocumentLabel = 'Detailed Calculation Letter' }
+		'ZHBDPA' 	{ $DocumentLabel = 'DHP acknowledgement letter' }
+		'HBDHPA' 	{ $DocumentLabel = 'DHP Decision Allowed' }
+		'ZBDHPD' 	{ $DocumentLabel = 'DHP Decision Sheet' }
+		'HBDHPR' 	{ $DocumentLabel = 'DHP Refused' }
+		'ZHBDIS' 	{ $DocumentLabel = 'Disregarded Property' }
+		'ZBDNRC' 	{ $DocumentLabel = 'DNR Returned Cheque' }
+		'ZHBDNR' 	{ $DocumentLabel = 'DNR Returned Mail' }
+		'ZHBVDN' 	{ $DocumentLabel = 'DNR Visit Request Memo' }
+		'HBDNQ' 	{ $DocumentLabel = 'Do not qualify letter' }
+		'HBDNQ2' 	{ $DocumentLabel = 'Do not qualify letter 2' }
+		'HBDED' 	{ $DocumentLabel = 'DWP 3rd party deductions letter' }
+		'ZHBDWP' 	{ $DocumentLabel = 'DWP Data match' }
+		'ZNHB6' 	{ $DocumentLabel = 'DWP Prisoner notification' }
+		'HBEGEN' 	{ $DocumentLabel = 'Evidence - general' }
+		'HBECAP' 	{ $DocumentLabel = 'Evidence of capital' }
+		'HBEARN' 	{ $DocumentLabel = 'Evidence of Earnings' }
+		'ZHBEID' 	{ $DocumentLabel = 'Evidence of Identity' }
+		'HBERNT' 	{ $DocumentLabel = 'Evidence of rent' }
+		'HBEINC' 	{ $DocumentLabel = 'Evidence of Unearned Income' }
+		'ZORMSC' 	{ $DocumentLabel = 'Formscan' }
+		'Z602' 		{ $DocumentLabel = 'Further Info (wizard)' }
+		'HBINFO' 	{ $DocumentLabel = 'Further information request letter' }
+		'ZHBHOL' 	{ $DocumentLabel = 'Get docs out of Benefit Holding tray' }
+		'GORR' 		{ $DocumentLabel = 'Gorry Look alike' }
+		'HB3PAF' 	{ $DocumentLabel = 'HB Application form - Pension Credit' }
+		'ZHBBAC' 	{ $DocumentLabel = 'HB BACS Letter' }
+		'ZBBACS' 	{ $DocumentLabel = 'HB BACS Request' }
+		'HBAFRQ' 	{ $DocumentLabel = 'HB claim form enclosure letter' }
+		'ZHBSUR' 	{ $DocumentLabel = 'HB do not use' }
+		'ZHBNAF' 	{ $DocumentLabel = 'HB NAFN credit search' }
+		'NHSMEM' 	{ $DocumentLabel = 'HB NHS Student Calculation' }
+		'HBOP' 		{ $DocumentLabel = 'HB Overpayment letter' }
+		'HBPORE' 	{ $DocumentLabel = 'Postal Review' }
+		'ZHBRR1' 	{ $DocumentLabel = 'HB Rapid Reclaim Form' }
+		'ZHBHBR' 	{ $DocumentLabel = 'HB Review Memo' }
+		'HBSTUM' 	{ $DocumentLabel = 'HB Student Calculation' }
+		'ZHBWOM' 	{ $DocumentLabel = 'HB/CTB Overpayment Write Off Memo' }
+		'ZHBEND' 	{ $DocumentLabel = 'HBEN Document Transfer Note' }
+		'ZHBMS' 	{ $DocumentLabel = 'HBMS Doc' }
+		'ZBHCB1' 	{ $DocumentLabel = 'HCTB1(prev nhb1)' }
+		'ZHCTB7' 	{ $DocumentLabel = 'HCTB7' }
+		'ZHCTB8' 	{ $DocumentLabel = 'HCTB8' }
+		'Z607' 		{ $DocumentLabel = 'HMO (wizard)' }
+		'ZHBHA' 	{ $DocumentLabel = 'Housing Association/RSL correspondence' }
+		'HBDHPO' 	{ $DocumentLabel = 'Housing Benefit DHP request outgoing' }
+		'ZBHBMS' 	{ $DocumentLabel = 'Housing Benefit Matching Service Memo' }
+		'ZHBCOM' 	{ $DocumentLabel = 'Housing Benefits Complaints Memo' }
+		'ZHBWIN' 	{ $DocumentLabel = 'Housing Benefits Compliments Memo' }
+		'ZHBLEB' 	{ $DocumentLabel = 'In Person Backdate Decision' }
+		'HBCOA' 	{ $DocumentLabel = 'In Person change of address' }
+		'HBCIC' 	{ $DocumentLabel = 'In Person Change of Circs' }
+		'HBLEAP' 	{ $DocumentLabel = 'In Person Claim Form' }
+		'ZBLERE' 	{ $DocumentLabel = 'In Person Review Form' }
+		'HBIVR' 	{ $DocumentLabel = 'Income Visit Statement - benefits' }
+		'ZBEREQ' 	{ $DocumentLabel = 'Info requested for claim' }
+		'ZHBEVR' 	{ $DocumentLabel = 'Information requested for claim' }
+		'ZHBMEM' 	{ $DocumentLabel = 'Internal memo to Benefits Holding' }
+		'ZHBMEM' 	{ $DocumentLabel = 'Internal Memo to Ctax' }
+		'HBFMEM' 	{ $DocumentLabel = 'Investigation Progress Report' }
+		'ZHBISE' 	{ $DocumentLabel = 'IS/JSA cancellation' }
+		'ZBIWK4' 	{ $DocumentLabel = 'IWK4 form' }
+		'ZIWK4' 	{ $DocumentLabel = 'IWK4- In & Out of Work Statement' }
+		'IWKECL' 	{ $DocumentLabel = 'IWKECL- In & Out of Work evidence check' }
+		'IWKLDF' 	{ $DocumentLabel = 'IWKLDF- In & Out of Work Landlord dec' }
+		'ZHBJHIN' 	{ $DocumentLabel = 'Julian House Memo Incoming' }
+		'ZHBJHO' 	{ $DocumentLabel = 'Julian House Memo Outgoing' }
+		'ZBLACE' 	{ $DocumentLabel = 'LACI - EAS' }
+		'ZBLACI' 	{ $DocumentLabel = 'LACI - PDCS' }
+		'ZBLEB1' 	{ $DocumentLabel = 'LEAN HB/CTB Backdate Request' }
+		'ZLEAME' 	{ $DocumentLabel = 'Lean Review - Int. memo to Council Tax' }
+		'ZLEANM' 	{ $DocumentLabel = 'Lean Review moving in/out memo' }
+		'ZHBISA' 	{ $DocumentLabel = 'Letter to IS/JSA with claim form' }
+		'HBVALL' 	{ $DocumentLabel = 'Valuation shared interest in a property' }
+		'ZLHA24'	{ $DocumentLabel = 'LHA 24-34 year olds' }
+		'ZHABAC' 	{ $DocumentLabel = 'LHA Backdating request' }
+		'ZLHAFA' 	{ $DocumentLabel = 'LHA Claimant Arrears Letter' }
+		'ZLHACL' 	{ $DocumentLabel = 'LHA Claimant Decision Letter' }
+		'LHAPRO' 	{ $DocumentLabel = 'LHA Eight Week Arrears Proforma' }
+		'ZLHALL' 	{ $DocumentLabel = 'LHA L/L Direct Payment Decision Letter' }
+		'ZLHAL' 	{ $DocumentLabel = 'LHA Landlord Eight Week Arrears Letter' }
+		'ZHBLHA' 	{ $DocumentLabel = 'LHA Letter 1 April 2011' }
+		'ZHBLHA' 	{ $DocumentLabel = 'LHA Letter 2 Aug 2011' }
+		'ZLHA52' 	{ $DocumentLabel = 'LHA unable to change rate for 52 weeks' }
+		'ZHBLCS'	{ $DocumentLabel = 'Live claim with suspended letter' }
+		'HBLAID' 	{ $DocumentLabel = 'Local Authority Input Document' }
+		'ZHBM' 		{ $DocumentLabel = 'Miscellaneous correspondence' }
+		'ZBMRFW' 	{ $DocumentLabel = 'Missing Rent Free Weeks' }
+		'ZBMPCO' 	{ $DocumentLabel = 'MP / Councillor correspondence' }
+		'HBVNC3' 	{ $DocumentLabel = 'New Claims Visited After 3 Mnths' }
+		'ZHBNEW' 	{ $DocumentLabel = 'New Claims Visiting Memo' }
+		'ZBNIGH'	{ $DocumentLabel = 'Night Shelter claims' }
+		'Z603' 		{ $DocumentLabel = 'Non Dependants (wizard)' }
+		'HBOPLA' 	{ $DocumentLabel = 'OP recovery from another LA' }
+		'HBCTOP' 	{ $DocumentLabel = 'Overpaid Council Tax Support ' }
+		'HBOPRE' 	{ $DocumentLabel = 'Overpayment - Recovery Review' }
+		'ZHBOPR' 	{ $DocumentLabel = 'Overpayment Referral Proforma' }
+		'Z618' 		{ $DocumentLabel = 'Overpayments Recovery (wizard)' }
+		'ZHBOPN' 	{ $DocumentLabel = 'Overpayments with recovery set to N' }
+		'ZHBPEN' 	{ $DocumentLabel = 'Pensioner Credits Entitlement' }
+		'ZBPERM' 	{ $DocumentLabel = 'permission to discuss' }
+		'HBPREV' 	{ $DocumentLabel = 'Postal review reminder/suspension' }
+		'ZHBPRE' 	{ $DocumentLabel = 'Postal review suspension letter' }
+		'ZHBPTD' 	{ $DocumentLabel = 'Pre Tenancy Determination' }
+		'ZHBQMC' 	{ $DocumentLabel = 'Quarterly Monitoring Checklist' }
+		'HBSUPR' 	{ $DocumentLabel = 'Reconsiderations and Supercessions' }
+		'HBRED' 	{ $DocumentLabel = 'Redetermination decision' }
+		'HBREN8' 	{ $DocumentLabel = 'Rent Arrears of more than 8 weeks' }
+		'ZHBRFW' 	{ $DocumentLabel = 'Rent Free Week memo' }
+		'ZBRODC' 	{ $DocumentLabel = 'Rent Officer Decision' }
+		'ZBRORF' 	{ $DocumentLabel = 'Rent Officer Referral' }
+		'ZBREQB' 	{ $DocumentLabel = 'Request for Benefit form' }
+		'ZHBREC' 	{ $DocumentLabel = 'Request for Ctax form letter' }
+		'RFD' 		{ $DocumentLabel = 'Request for Directions' }
+		'HBREC' 	{ $DocumentLabel = 'Request for reconsideration' }
+		'HBRENQ' 	{ $DocumentLabel = 'Response to Enquiry blank letter' }
+		'ZHBV31' 	{ $DocumentLabel = 'Results of 3 Mnth Visit' }
+		'ZHBVSP' 	{ $DocumentLabel = 'Results of SPD Visit' }
+		'ZHBRET' 	{ $DocumentLabel = 'Returned mail' }
+		'HBDHP1' 	{ $DocumentLabel = 'Revision/Supercession Decision' }
+		'ZHBROR' 	{ $DocumentLabel = 'RO Redetermination' }
+		'HBOP1' 	{ $DocumentLabel = 'Sanction appendix D' }
+		'HBOP2' 	{ $DocumentLabel = 'Sanction appendix E' }
+		'ZHB2AF' 	{ $DocumentLabel = 'Second Adult Rebate Form Outgoing' }
+		'HBSECS' 	{ $DocumentLabel = 'Self Employed Calculation sheet' }
+		'HBSEFM' 	{ $DocumentLabel = 'Self Employed form and notes' }
+		'HBSEIN' 	{ $DocumentLabel = 'Self Employed Initial Income Form' }
+		'ZBBIRT' 	{ $DocumentLabel = 'Significant Age Report' }
+		'ZHBSPD' 	{ $DocumentLabel = 'Single Person Discount check' }
+		'Z1' 		{ $DocumentLabel = 'Single Person Discount review form' }
+		'ZOM2AR' 	{ $DocumentLabel = 'Somer 2AR Form Incoming' }
+		'ZSOMAF' 	{ $DocumentLabel = 'Somer Application Form' }
+		'ZOMCIC' 	{ $DocumentLabel = 'Somer Benefit Change in Circs' }
+		'ZOMCOA' 	{ $DocumentLabel = 'Somer Benefit Change of Address' }
+		'ZOMEMP' 	{ $DocumentLabel = 'Somer Benefit Employers Certificate' }
+		'ZOMCOE' 	{ $DocumentLabel = 'Somer Certificate of Earnings' }
+		'ZOMCCF' 	{ $DocumentLabel = 'Somer Change in Circs Form' }
+		'ZOMGEN' 	{ $DocumentLabel = 'Somer Evidence General' }
+		'ZOMCAP'	{ $DocumentLabel = 'Somer Evidence of Capital' }
+		'ZOMEAR' 	{ $DocumentLabel = 'Somer Evidence of Earnings' }
+		'ZOMEID' 	{ $DocumentLabel = 'Somer Evidence of ID' }
+		'ZOMINC' 	{ $DocumentLabel = 'Somer Evidence of Income' }
+		'ZOMERT' 	{ $DocumentLabel = 'Somer Evidence of Rent' }
+		'ZOMPAF' 	{ $DocumentLabel = 'Somer HB AF Pension Credit' }
+		'ZOMVRQ' 	{ $DocumentLabel = 'Somer Information Request for Claim' }
+		'ZOMVFR' 	{ $DocumentLabel = 'Somer Verification Review Form' }
+		'ZOMVUD' 	{ $DocumentLabel = 'Somer Very Urgent Benefits Document' }
+		'ZOMVFT' 	{ $DocumentLabel = 'Somer VF Tenant Consent Form' }
+		'ZOMVFW' 	{ $DocumentLabel = 'Somer VF Withdrawl of Consent' }
+		'ZHBSD1' 	{ $DocumentLabel = 'Sundry Debt Over £1000' }
+		'ZBSDCR' 	{ $DocumentLabel = 'Sundry Debtor/Credit Note' }
+		'ZHBSUR' 	{ $DocumentLabel = 'Survey form enclosure letter benefits' }
+		'ZBTCNP' 	{ $DocumentLabel = 'Tax Credit prof not processed' }
+		'ZHBTCP' 	{ $DocumentLabel = 'Tax Credit proforma' }
+		'ZBTCPN' 	{ $DocumentLabel = 'Tax Credit proforma no info' }
+		'ZBTAXC' 	{ $DocumentLabel = 'Tax Credits Entitlement' }
+		'ZHBTEN' 	{ $DocumentLabel = 'Tenancy agreement' }
+		'ZBTRAN' 	{ $DocumentLabel = 'Transitional HB doc' }
+		'HBNORI' 	{ $DocumentLabel = 'Unable to refer rent increase' }
+		'ZHBUNV' 	{ $DocumentLabel = 'Unsuccessful  Intervention Visit' }
+		'ZHBCMU' 	{ $DocumentLabel = 'Urgent Benefits Counter Memo' }
+		'ZBEUCT' 	{ $DocumentLabel = 'Urgent Benefits Internal Memo to Ctax' }
+		'ZHBTMU' 	{ $DocumentLabel = 'Urgent Benefits Telephone Memo' }
+		'ZHBURC' 	{ $DocumentLabel = 'Urgent Cancellation Memo' }
+		'HBVAL' 	{ $DocumentLabel = 'Valuation of Interest in Property' }
+		'ZHBVFR' 	{ $DocumentLabel = 'Verification Framework Review Form' }
+		'ZHBVF' 	{ $DocumentLabel = 'Verification Framework visit appointment' }
+		'ZBBACU' 	{ $DocumentLabel = 'Very Urgent BACS Document' }
+		'ZHBVUD' 	{ $DocumentLabel = 'Very Urgent Benefits Document' }
+		'ZOMORI' 	{ $DocumentLabel = 'VF Original Documents Sighted' }
+		'ZHBVFV' 	{ $DocumentLabel = 'VF Second Reschedule Letter' }
+		'ZHBVFR' 	{ $DocumentLabel = 'VF Visit Reschedule Memo' }
+		'ZBVRRF' 	{ $DocumentLabel = 'Victer Failed Rent Referral' }
+		'ZHBVRO' 	{ $DocumentLabel = 'Victer Rent Officer Referral' }
+		'ZHBWFT' 	{ $DocumentLabel = 'WFTC Expiry letter' }
+		'HBYPBD' 	{ $DocumentLabel = 'Young Persons Birthday enquiry' }
+		'ZHBYPB' 	{ $DocumentLabel = 'Young Persons Birthday Postal Review' }
+		'HBSADL' 	{ $DocumentLabel = 'Your sad loss' }
+		'ZHBPCI' 	{ $DocumentLabel = 'ZDWP Pensioner Credit Initial Award' }
+		'ZLEANM' 	{ $DocumentLabel = 'ZLean Rev moving in/out memo' }
+		'HBRFD' 	{ $DocumentLabel = 'ZR' }
+		'ZHBSPS' 	{ $DocumentLabel = 'ZSP Subsidy Application Form' }
+	}
+	
+	switch ($DocLabelCode)
+    {
+		'R16' 		{ $DocumentGuid = '665baf81-91f7-47c5-a815-2c1c8a9b0512' }
+		'R11' 		{ $DocumentGuid = '32194c54-4ff3-4ae2-bf79-d73f424969f3' }
+		'RAOE03' 	{ $DocumentGuid = 'ab73cd0f-33a7-40be-bdba-61a4d8fb0d32' }
+		'RAOE04' 	{ $DocumentGuid = '4730ec5c-c413-46ba-a426-0bb9a5d5fc3e' }
+		'RCSTG1' 	{ $DocumentGuid = '8bddb5d5-7721-4069-8bd7-5837b5c6bafb' }
+		'BSSLET' 	{ $DocumentGuid = '41fd9de1-3444-4248-a6af-ac17a3c5be2f' }
+		'CLETT' 	{ $DocumentGuid = '11bdbb89-285d-4805-b68d-c9524a45cc53' }
+		'RISD10' 	{ $DocumentGuid = '2ff55d88-3b56-4687-bf17-f7a7ef535985' }
+		'CTCOND' 	{ $DocumentGuid = '8bc1bc10-f80d-45ab-a065-e7abe2bd5d17' }
+		'CTDECD' 	{ $DocumentGuid = '0550dd02-5ab4-428d-a850-9aa8bcadde04' }
+		'R71' 		{ $DocumentGuid = '29c1bcb5-2df5-4bdd-abf6-632838f84f52' }
+		'CTBINC' 	{ $DocumentGuid = 'fc1dfa3e-55ef-47df-923f-00e384f58ac5' }
+		'CTPBC' 	{ $DocumentGuid = 'b260f76c-edef-4203-96a4-d0701e160f8b' }
+		'CTPOD' 	{ $DocumentGuid = '9ea9debf-8ac9-44d0-906a-43afbccda8df' }
+		'CTDDRQ' 	{ $DocumentGuid = '8a9e81d1-e991-4753-9ef7-e7404295d48e' }
+		'CTBINP' 	{ $DocumentGuid = '6a3e447f-280f-4956-a539-7701abdc4776' }
+		'BANFUL' 	{ $DocumentGuid = '5e269e09-d551-4a96-b2d4-1bf0df2cf18b' }
+		'RDNR19' 	{ $DocumentGuid = '64939869-7a3d-43aa-9103-f90be2c6079e' }
+		'RBADED' 	{ $DocumentGuid = '389540ca-77d5-4c07-bca9-4aaaadf07141' }
+		'PENDED' 	{ $DocumentGuid = '96c07364-b78a-4e44-9dfc-91c256c29b40' }
+		'RDNR20' 	{ $DocumentGuid = 'c3d38c50-2f22-41c9-b4d4-642c8d15e7b4' }
+		'PENDED' 	{ $DocumentGuid = '36396fab-3373-4dc9-9923-93571710900f' }
+		'R13' 		{ $DocumentGuid = 'def0a020-614f-4c9a-986e-7ea4cd9b57c7' }
+		'RCFA24' 	{ $DocumentGuid = 'c4e200d6-ae2a-4339-93e7-775ab3d42379' }
+		'CTFARE' 	{ $DocumentGuid = 'fc93adf5-6f41-44cd-a915-257b4b03861e' }
+		'CHMOLL' 	{ $DocumentGuid = 'e3da20a2-9967-4fad-840a-7ea569044c6f' }
+		'CTDDIN' 	{ $DocumentGuid = '75ac9fea-d723-42c0-97b0-159a8bbe39dc' }
+		'CJOICR' 	{ $DocumentGuid = 'adf756da-e84c-42f9-802f-cdf2ee34b5b7' }
+		'LASTDA' 	{ $DocumentGuid = '425ef79d-7f13-4980-9fa6-58d9e5103ebb' }
+		'CTLIA1' 	{ $DocumentGuid = 'db426779-fc50-4fd9-8985-e0e986b47d6a' }
+		'CMISC' 	{ $DocumentGuid = '436e9ace-2625-487b-ad92-9bf406a08e57' }
+		'RCOM12' 	{ $DocumentGuid = '2c9b06a1-04c9-4ffb-8692-0c648ed839ff' }
+		'RNOIBA' 	{ $DocumentGuid = '0733a134-0b92-49bb-8fbe-5c9210b1aac2' }
+		'RCBAI' 	{ $DocumentGuid = '08c0ded8-b01c-4be1-ad7c-4c7550d9230f' }
+		'RBANKD' 	{ $DocumentGuid = 'be6b63d3-80e4-494a-8140-a384aab899fe' }
+		'RCHARG' 	{ $DocumentGuid = 'e2beff7f-8ec7-4474-89b8-71959774b85d' }
+		'RCCOU' 	{ $DocumentGuid = '15d5f314-2860-4916-b569-5e26a747f65f' }
+		'RCFID' 	{ $DocumentGuid = '85328ca7-f0c9-4360-a639-dcfe27fa01e0' }
+		'RMISC' 	{ $DocumentGuid = '79142d0d-9176-4502-b743-0dc37239fdb8' }
+		'RFME' 		{ $DocumentGuid = '0a44e0a2-ff8a-4fa4-89ea-3ea525adda86' }
+		'CTSMIO' 	{ $DocumentGuid = 'e3b8b82a-2067-43b2-9e2e-73609497a5e4' }
+		'SHEW1' 	{ $DocumentGuid = '427eeba0-147e-4176-b538-ec47c37c0375' }
+		'CSTUC' 	{ $DocumentGuid = '7fe79329-b771-40bd-9096-1a843d4157c1' }
+		default		{ $DocumentGuid = '79142d0d-9176-4502-b743-0dc37239fdb8' }
+	}
+	
+	# The title - add document label as we're losing lots of historic ones.
+	$Title = $Path.Substring($Path.LastIndexOf("\") + 1) + " (Migration: " + $Documentlabel + ")"
+
+	# Call the upload function
+	if ($DocumentGuid -ne '') {
+		Write-Output $DocumentLabel
+		UploadFile "http://Spaniel/" "DropOffLibrary" $Path $ContentType $DocumentGuid $Reference $CreatedDate $Title
+	}
+}

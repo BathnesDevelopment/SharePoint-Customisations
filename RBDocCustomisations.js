@@ -162,7 +162,7 @@ function VerifyReference(reference, type) {
     var result = false;
     $.support.cors = true;
     $.ajax({
-        url: 'http://vm-ms-spt-1b:8080/Service1.svc/GetData',
+        url: 'http://rbdoc:8080/Service1.svc/GetData',
         dataType: "json",
         type: 'POST',
         async: false,
