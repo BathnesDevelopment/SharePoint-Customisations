@@ -103,6 +103,13 @@ $(function(){
             document.styleSheets[0].insertRule("td.ms-list-addnew {display:none !important;}",1);
         }
     }, "DragDrop.js");
+    
+    /////////////////////////////////////////////////
+    // REQUEST: Auto-tag some NNDR documents
+    /////////////////////////////////////////////////
+    if (window.location.pathname.endsWith("EditForm.aspx")) {
+        autocompleteNNDR();
+    }
 });
 
 ////////////////////////////////////////////////////////////////
@@ -737,5 +744,32 @@ function ensureUserSuccess() {
 function onFail(sender, args) {
     alert('Query failed. Error: ' + args.get_message());
 }
-
+////////////////////////////////////////////////////////////////
+// AUTOCOMPLETE NNDR
+// Completes the Document Label in NNDR for EditForm.aspx
+////////////////////////////////////////////////////////////////
+var autocompleteNNDR = function() {
+    var contentTypes = 'ctl00_ctl40_g_cfaf4660_86ea_441d_8e93_5afe9f54624f_ctl00_ctl02_ctl00_ctl00_ctl00_ContentTypeChoice';
+    var currentContentType = $('#'+contentTypes).val();
+    if (currentContentType === "0x0101004F1F949CD0D8C0489E8C896C96477061030600F1655C99F75BEB40A6003FB62E64CB28") {
+        // Rating Change Letter
+        document.getElementById("Document_x0020_Label_x0020__x0028_NNDR_x0029__$containereditableRegion").innerHTML = 'Rating Change Letter';
+    }
+    else if ( currentContentType === "0x0101004F1F949CD0D8C0489E8C896C96477061030500C05318C04B62E0468F77D41560AB0B4E") {
+        // Section 44A
+        document.getElementById("Document_x0020_Label_x0020__x0028_NNDR_x0029__$containereditableRegion").innerHTML = 'Section 44A Application';
+    }
+    else if ( currentContentType === "0x0101004F1F949CD0D8C0489E8C896C964770610307003A9DF27A86BD1B4EB391ED1E2183C892") {
+        // Tax Cert
+        document.getElementById("Document_x0020_Label_x0020__x0028_NNDR_x0029__$containereditableRegion").innerHTML = 'Tax Certificate​';
+    }
+    else if ( currentContentType === "0x0101004F1F949CD0D8C0489E8C896C96477061030800B2AABD69EF7F96458CD564838B4A91A6") {
+        // Valuation Officer correspondence
+        document.getElementById("Document_x0020_Label_x0020__x0028_NNDR_x0029__$containereditableRegion").innerHTML = 'Valuation Officer Correspondence​';
+    }
+    else if (currentContentType === "0x0101004F1F949CD0D8C0489E8C896C96477061030300705489A111A3414294B6152AF51AA28C") {
+        // Overpayment Calculation
+        document.getElementById("Document_x0020_Label_x0020__x0028_NNDR_x0029__$containereditableRegion").innerHTML = 'Overpayment Calculation​';
+    }
+}
 </script>
