@@ -53,7 +53,7 @@ function UploadFile($WebURL, $DocLibName, $FilePath, $ContentType, $DocumentGuid
 	$UploadedFile.Item.Update()
 }
 
-$ImportCSV = import-csv C:\Migration\CTaxIndexSub.csv
+$ImportCSV = import-csv C:\Migration\CTaxIndex.csv
 
 foreach($file in $ImportCSV)
 {
