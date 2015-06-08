@@ -8,6 +8,7 @@
 <script type="text/javascript" src="/_layouts/15/autofill.js"></script>
 
 <script type="text/javascript">
+//<![CDATA[
 
 var context = null;
 var web = null;
@@ -94,10 +95,10 @@ $(function(){
     // Users have requested that drag and drop be disabled in the main record libraries.
     //////////////////////////////////////////////////
     ExecuteOrDelayUntilScriptLoaded(function() {
-        if ((window.location.href.search("rbdoc/Revenues") !== -1) ||
-            (window.location.href.search("rbdoc/Benefits") !== -1) ||
-			(window.location.href.search("rbdoc/Fraud") !== -1) ||
-            (window.location.href.search("rbdoc/NNDR") !== -1)) {
+        if ((window.location.href.toLowerCase().search("rbdoc/revenues") !== -1) ||
+            (window.location.href.toLowerCase().search("rbdoc/benefits") !== -1) ||
+			(window.location.href.toLowerCase().search("rbdoc/fraud") !== -1) ||
+            (window.location.href.toLowerCase().search("rbdoc/nndr") !== -1)) {
             g_uploadType = DragDropMode.NOTSUPPORTED;
             SPDragDropManager.DragDropMode = DragDropMode.NOTSUPPORTED;
             document.styleSheets[0].insertRule("td.ms-list-addnew {display:none !important;}",1);
@@ -317,7 +318,7 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
                 if (WPQ2ListData.Row[rowItem].ID == selectedItemIds[i].id) {
                     items += WPQ2ListData.Row[rowItem].FileLeafRef + '<br/>';
                     if (WPQ2ListData.Row[rowItem].CheckoutUser && WPQ2ListData.Row[rowItem].CheckoutUser !== "") {
-                        multiContinueError += "One or more of the selected items are checked out.\n Please ask the user who has checked this document out to check it in before continuing.";
+                        multiContinueError = "One or more of the selected items are checked out.\n Please ask the user who has checked this document out to check it in before continuing.";
                     }
                 }
             }
@@ -325,14 +326,14 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
 
         if (wfType == 'Transfer' || wfType == 'ReIndex' || wfType == 'CarbonCopy') {
             // May as well do this early as the transferField is used in the different workflows.
-            if (window.location.href.search("rbdoc/Revenues") !== -1) {
-                transferField = "Account_x0020_Ref";
+            if (window.location.href.toLowerCase().search("rbdoc/revenues") !== -1) {
+                transferField = "Account_x0020_Reference";
                 transferType = "A";
-            } else if (window.location.href.search("rbdoc/Benefits") !== -1) {
+            } else if (window.location.href.toLowerCase().search("rbdoc/benefits") !== -1) {
                 transferField = "Claim_x0020_Ref";
                 transferType = "C";
-            } else if (window.location.href.search("rbdoc/NNDR") !== -1) {
-                transferField = "NNDR_x0020_Ref";
+            } else if (window.location.href.toLowerCase().search("rbdoc/nndr") !== -1) {
+                transferField = "NNDR_x0020_Reference";
                 transferType = "N";
             }
         }
@@ -353,7 +354,7 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
                             else
                             {
                                 if (existingValues.Reference != WPQ2ListData.Row[rowItem][transferField]){
-                                    multiContinueError += "You cannot bulk transfer items with different reference numbers.";
+                                    multiContinueError = "You cannot bulk transfer items with different reference numbers.";
                                 }
                             }
                         }
@@ -395,7 +396,7 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
                             else
                             {
                                 if (existingValues.Reference != WPQ2ListData.Row[rowItem][transferField]){
-                                    multiContinueError += "You cannot bulk transfer items with different reference numbers.";
+                                    multiContinueError = "You cannot bulk transfer items with different reference numbers.";
                                 }
                             }
                         }
@@ -435,7 +436,7 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
                             else
                             {
                                 if (existingValues.Reference != WPQ2ListData.Row[rowItem][transferField]){
-                                    multiContinueError += "You cannot bulk transfer items with different reference numbers.";
+                                    multiContinueError = "You cannot bulk transfer items with different reference numbers.";
                                 }
                             }
                         }
@@ -738,4 +739,5 @@ function onFail(sender, args) {
     alert('Query failed. Error: ' + args.get_message());
 }
 
+//]]>
 </script>

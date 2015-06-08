@@ -1,4 +1,4 @@
-Add-PSSnapin Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue
+﻿Add-PSSnapin Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue
 
 # Function to Upload File
 function UploadFile($WebURL, $DocLibName, $FilePath, $ContentType, $DocumentGuid, $Reference, $CreatedDate, $Title)
@@ -7,10 +7,10 @@ function UploadFile($WebURL, $DocLibName, $FilePath, $ContentType, $DocumentGuid
 	$Web = Get-SPWeb $WebURL
 	$Site = Get-SPSite $WebURL
 	$List = $Web.GetFolder($DocLibName)
-	
+
 	# Get the Files collection from SharePoint Document Library
 	$Files = $List.Files
-	
+
 	# Get File Name from Path
 	$FileName = $FilePath.Substring($FilePath.LastIndexOf("\") + 1)
 
@@ -28,24 +28,21 @@ function UploadFile($WebURL, $DocLibName, $FilePath, $ContentType, $DocumentGuid
 	# Benefits documents
 	if ($ContentType -like '*Benefits*') { 
 		$UploadedFile.Item["Document Label (Bens)"] = $DocumentGuid
-		$UploadedFile.Item["Reference"] = $Reference
+		$UploadedFile.Item["Claim Reference"] = $Reference
 	}
-
 	if ($ContentType -like '*Appeal*') { 
 		$UploadedFile.Item["Document Label (Bens)"] = $DocumentGuid
-		$UploadedFile.Item["Reference"] = $Reference
+		$UploadedFile.Item["Claim Reference"] = $Reference
 	}
-	
 	# Revenues documents
 	if ($ContentType -like '*Revenues*') { 
 		$UploadedFile.Item["Document Label (Revs)"] = $DocumentGuid
-		$UploadedFile.Item["Reference"] = $Reference
+		$UploadedFile.Item["Reference"] = $Reference		
 	}
-	
 	# NNDR documents
 	if ($ContentType -like '*NNDR*') { 
 		$UploadedFile.Item["Document Label (NNDR)"] = $DocumentGuid
-		$UploadedFile.Item["Reference"] = $Reference
+		$UploadedFile.Item["NNDR Reference"] = $Reference
 	}
 
 	# Title is common to all types.  There is no default title for the migration so we use the file name.
@@ -53,7 +50,7 @@ function UploadFile($WebURL, $DocLibName, $FilePath, $ContentType, $DocumentGuid
 	$UploadedFile.Item.Update()
 }
 
-$ImportCSV = import-csv C:\Migration\CTaxIndex.csv
+$ImportCSV = import-csv C:\Migration\NNDRIndex.csv
 
 foreach($file in $ImportCSV)
 {
@@ -62,7 +59,7 @@ foreach($file in $ImportCSV)
 	$TypeCode = $file.RefNo
 	$DocLabelCode = $file.TypeTag
 	
-	$Path = '\\rai\t$\ExportWorkingFolder\CTAXLargeScale' + $file.ExportFileName
+	$Path = '\\rai\t$\ExportWorkingFolder\NNDR\LargeScale' + $file.ExportFileName
 	
 	# Content type, document label, and GUID will be set in switch statements.
 	$ContentType = ''
@@ -70,8 +67,7 @@ foreach($file in $ImportCSV)
 	$DocumentGuid = ''
 	
 	# Some account references will have checks in - remove these.
-	$pattern = '[^a-zA-Z]'
-	$Reference -replace $pattern, ' '
+	$Reference -creplace '[a-zA-Z]', ''
 	
 	# Convert the created date
 	$CreatedDate = Get-Date $Date
@@ -89,8 +85,13 @@ foreach($file in $ImportCSV)
 		'CS-NNDR-06' { $ContentType = 'NNDR Section 44A Certificate And Application' }
 		'CS-NNDR-07' { $ContentType = 'NNDR Tax Certificate' }
 		'CS-NNDR-08' { $ContentType = 'NNDR Valuation Officer correspondence' }
-        default { }
     }
+
+	# Set default document label GUIDs
+	if ($ContentType -like '*Benefits*') { $DocumentGuid = '82c95cc9-8597-4e61-8af8-9b8997314074'}
+	if ($ContentType -like '*Appeal*') { $DocumentGuid = '82c95cc9-8597-4e61-8af8-9b8997314074' }
+	if ($ContentType -like '*Revenues*') { $DocumentGuid = '79142d0d-9176-4502-b743-0dc37239fdb8' }
+	if ($ContentType -like '*NNDR*') { $DocumentGuid = 'e51091be-3b1c-40d5-898a-787d1d1bcf8e' }
 
 	switch ($DocLabelCode)
     {
@@ -780,6 +781,7 @@ foreach($file in $ImportCSV)
 	
 	switch ($DocLabelCode)
     {
+		# Revenues codes.
 		'R16' 		{ $DocumentGuid = '665baf81-91f7-47c5-a815-2c1c8a9b0512' }
 		'R11' 		{ $DocumentGuid = '32194c54-4ff3-4ae2-bf79-d73f424969f3' }
 		'RAOE03' 	{ $DocumentGuid = 'ab73cd0f-33a7-40be-bdba-61a4d8fb0d32' }
@@ -823,15 +825,130 @@ foreach($file in $ImportCSV)
 		'CTSMIO' 	{ $DocumentGuid = 'e3b8b82a-2067-43b2-9e2e-73609497a5e4' }
 		'SHEW1' 	{ $DocumentGuid = '427eeba0-147e-4176-b538-ec47c37c0375' }
 		'CSTUC' 	{ $DocumentGuid = '7fe79329-b771-40bd-9096-1a843d4157c1' }
-		default		{ $DocumentGuid = '79142d0d-9176-4502-b743-0dc37239fdb8' }
+
+		# Benefits codes.
+		'HB2WCN' 	{ $DocumentGuid = '4c79e61b-7398-4144-9bfd-8df4ae016b4e' }
+		'HBV3M2' 	{ $DocumentGuid = '511cf103-7dc4-4a41-972c-af2fad9f34db' }
+		'HBV3M' 	{ $DocumentGuid = 'd007052d-894e-485d-be05-b5567ff89e3f' }
+		'HBAPTP' 	{ $DocumentGuid = '1e0a8a68-5777-4d8f-81f7-95df286580fd' }
+		'APPE' 		{ $DocumentGuid = '7012a681-1e2d-4cdf-8a5e-eb838d94dda3' }
+		'HBAPSE' 	{ $DocumentGuid = 'c3c0d8fb-932a-4d8d-9d12-64707249213a' }
+		'HBAPLD' 	{ $DocumentGuid = '7e69a6a6-0624-496e-9074-971c7a7b42e0' }
+		'HBACK' 	{ $DocumentGuid = '23f6b2cd-8a8c-46be-9f10-ab5f4d4aaa22' }
+		'HBBACK' 	{ $DocumentGuid = '3e45e09d-76a8-4fdf-9398-1798bf129b78' }
+		'HBCIC' 	{ $DocumentGuid = '73c01fd1-c3a2-4066-b60d-8d9ecb6ae9fd' }
+		'HBSUSP' 	{ $DocumentGuid = '487392d8-c666-4107-9de0-11ba890eaf48' }
+		'HBAPPE' 	{ $DocumentGuid = 'b5ddebb6-698a-49d7-9568-0fd1fc94c0bf' }
+		'HBAF' 		{ $DocumentGuid = 'f0ca6270-d8c8-4c9f-b3c7-975e924ab08f' }
+		'BED' 		{ $DocumentGuid = '58a440ee-2ece-4a50-b3c0-a0214ce6bd93' }
+		'HBCICF' 	{ $DocumentGuid = '3aebd530-e090-40f0-be73-09ba8e2685fe' }
+		'HBCOAF' 	{ $DocumentGuid = '0a40351e-6e22-4786-9190-eae70658ccb7' }
+		'HBDHPB' 	{ $DocumentGuid = '719a3c7f-75ba-446e-8755-215107d7ba2c' }
+		'HBINLE' 	{ $DocumentGuid = 'c6e67390-f6e7-4aff-aed1-f9e2ecd3f275' }
+		'HBINIT' 	{ $DocumentGuid = '6074382e-8f64-418e-8ae1-d94abcfacf22' }
+		'HBIC' 		{ $DocumentGuid = '0a1519c5-de32-40c7-849e-ce5bcbf1b38d' }
+		'HBVAL1' 	{ $DocumentGuid = '7cea6851-4179-4adb-9e69-dcea74d8c866' }
+		'HBCOE' 	{ $DocumentGuid = '8e140253-2d19-4fa1-8331-2cc7d7f0f8bd' }
+		'COMPLS' 	{ $DocumentGuid = 'e1184888-a286-43a0-a330-df7800f42929' }
+		'COMPL1' 	{ $DocumentGuid = '5debfd56-67f7-4925-b283-7a3a6ca731c8' }
+		'HBCCA' 	{ $DocumentGuid = '8700d0ce-5eb7-4b67-a21b-a6cddcdd5964' }
+		'HBLETE' 	{ $DocumentGuid = '16aeb0c4-15f4-4c56-8d99-af1004fda876' }
+		'HBDHPA' 	{ $DocumentGuid = '0ac6653f-aba3-47f7-ba4d-0b1571a4d283' }
+		'HBDHPR' 	{ $DocumentGuid = '47dd1ddd-7832-4d00-be42-140200aaccc3' }
+		'HBDNQ' 	{ $DocumentGuid = '4fa116bd-f6b7-4e97-97fb-6dc1b41f453c' }
+		'HBDED' 	{ $DocumentGuid = '7c850f4c-3daf-43b4-91ce-cc41f369f72a' }
+		'HBEGEN' 	{ $DocumentGuid = '82c95cc9-8597-4e61-8af8-9b8997314074' }
+		'HBECAP' 	{ $DocumentGuid = 'd971860d-6a7f-4f1e-a27c-e3e7455c8ba2' }
+		'HBEARN' 	{ $DocumentGuid = '93f68462-57b7-4206-a42a-0f88fba07ddc' }
+		'HBERNT' 	{ $DocumentGuid = '9824368b-0ee5-4919-81f4-8f0a1d1cdd37' }
+		'HBEINC' 	{ $DocumentGuid = 'e0238254-a626-47d6-9b59-ee58c845776b' }
+		'HBINFO' 	{ $DocumentGuid = 'e5674dd9-8af4-4bc1-bf26-ae86dde0995c' }
+		'HBAFRQ' 	{ $DocumentGuid = 'a9a949be-a857-4a5b-b574-1affc54fb6ab' }
+		'HBOP' 		{ $DocumentGuid = 'fd68566c-796e-4e88-8bb5-a8545e6fe522' }
+		'HBSTUM' 	{ $DocumentGuid = '39b66090-8ca7-4038-aa2e-a1ebcc4e4462' }
+		'HBDHPO' 	{ $DocumentGuid = 'c983b382-4e4d-4510-a94f-e5b44c764295' }
+		'HBCOA' 	{ $DocumentGuid = '028cc6bf-9758-4198-84d2-ce818ae130b4' }
+		'HBCIC' 	{ $DocumentGuid = '6de050e2-81a8-4e04-b7e1-31e69feffa8b' }
+		'HBLEAP' 	{ $DocumentGuid = '230cc655-5e48-4d5e-9af7-f21622444194' }
+		'HBIVR' 	{ $DocumentGuid = '4e01d75f-0589-439d-9a95-1ac27530e32f' }
+		'HBFMEM' 	{ $DocumentGuid = 'd8a6b636-d4ad-4611-a7c2-ea97dc63ad76' }
+		'IWKECL' 	{ $DocumentGuid = 'db5b6cb7-c3e2-45ff-9882-b71cf0a61bae' }
+		'IWKLDF' 	{ $DocumentGuid = 'a256422b-3e04-4fae-89ca-f9a87bb29827' }
+		'HBVALL' 	{ $DocumentGuid = '987df59c-e65d-45a2-9daa-8d4ca803b04d' }
+		'LHAPRO' 	{ $DocumentGuid = '0ffa9ff2-d37e-4c31-a5f5-f70c86a461e4' }
+		'HBLAID' 	{ $DocumentGuid = '863510fd-c5b4-4606-ba9c-1f1b76d36db8' }
+		'HBVNC3' 	{ $DocumentGuid = 'a1ba1033-450a-4ccb-8ced-704258e028c5' }
+		'HBOPLA' 	{ $DocumentGuid = '1a9419df-7f66-421a-b0cb-f0ee588b0a4d' }
+		'HBCTOP' 	{ $DocumentGuid = '001edc53-5184-498c-ac70-cb87f6f805fe' }
+		'HBOPRE' 	{ $DocumentGuid = '5c376b86-398d-48e1-85fb-ab438180c303' }
+		'HBPREV' 	{ $DocumentGuid = '21d0c11e-4664-4920-9cd3-336c977b3343' }
+		'HBRED' 	{ $DocumentGuid = 'f96199d1-6463-4f17-ad55-cee12f182ffb' }
+		'RFD' 		{ $DocumentGuid = '19d6a452-efad-45f0-9cfa-a44a81258109' }
+		'HBREC' 	{ $DocumentGuid = 'ad764f2a-10bb-4b3c-b902-9aa54087c348' }
+		'HBRENQ' 	{ $DocumentGuid = '3ce853b1-e8bb-40ed-9efb-4babe84b10f7' }
+		'HBDHP1' 	{ $DocumentGuid = 'd29ef4f8-322b-449d-b845-0a6d469163aa' }
+		'HBOP1' 	{ $DocumentGuid = '49b0b815-3790-4f95-a629-f3219b8fd334' }
+		'HBOP2' 	{ $DocumentGuid = '4cd27e38-a915-44ca-b452-7aef01afd676' }
+		'HBSECS' 	{ $DocumentGuid = '92583362-2b8c-4bba-bd6b-21c7ebde1539' }
+		'HBSEFM' 	{ $DocumentGuid = '0ba8ad23-91ed-418b-8c50-563917d692f2' }
+		'HBSEIN' 	{ $DocumentGuid = 'd641b6b1-3c13-4c3e-9f2b-2bcf30cb075b' }
+		'HBNORI' 	{ $DocumentGuid = 'e110fd65-b25a-417b-928a-24ed955dde3f' }
+		'HBVAL' 	{ $DocumentGuid = '9fa65816-fe22-41db-b32b-d585af7e3e90' }
+		'HBYPBD' 	{ $DocumentGuid = 'efc541bf-1675-41cc-94ba-7edc114ff917' }
+		'HBSADL' 	{ $DocumentGuid = '298c4a7d-3a0e-4da8-8ed4-ab679e265f30' }
+
+		# NNDR codes
+		'NDCOMP' 	{ $DocumentGuid = '2f7b3a6c-a57d-4edf-a65c-8ea959275358' }
+		'NBID'		{ $DocumentGuid = 'dfbb2464-bca9-4976-8e87-6c5fcf7f5e0b' }
+		'NDLETT' 	{ $DocumentGuid = 'ba7864e0-bb45-45e1-acd6-8c6faa87fc42' }
+		'NCOVO' 	{ $DocumentGuid = 'aea006df-2e54-4381-98b5-43232569b0c0' }
+		'NDRDEF' 	{ $DocumentGuid = 'd31bff23-80a2-4be6-a81a-f5a7a4904d80' }
+		'NDERF' 	{ $DocumentGuid = '5c9d5d96-54f9-4439-a72e-6028a2d4ad37' }
+		'NDDRRA' 	{ $DocumentGuid = '40fc662a-119d-48b2-ae81-4afc3b553de0' }
+		'NDDRA' 	{ $DocumentGuid = '9aadb269-deff-4b49-91dc-64d7f816e279' }
+		'NDREV' 	{ $DocumentGuid = 'dd927375-f071-42cc-86ed-242887dc3d7b' }
+		'NDEXRQ' 	{ $DocumentGuid = '9979eb24-d15a-4a86-b02d-0bdc724838af' }
+		'NDHRA' 	{ $DocumentGuid = '5c447381-c95e-4f38-9d2d-c229b1636da9' }
+		'NIRLR' 	{ $DocumentGuid = 'b597d10f-72f7-431b-9d99-5ea2b097c96a' }
+		'NDINSO' 	{ $DocumentGuid = '4df15dd1-f521-44ff-a50d-3ea713d08fad' }
+		'NDMRRA' 	{ $DocumentGuid = 'a5bdfed5-6840-4771-a779-45bdde4c973b' }
+		'NDMAP' 	{ $DocumentGuid = '69d9a5d1-27ca-44cc-949f-952b0cef37e4' }
+		'NDMISL' 	{ $DocumentGuid = 'e51091be-3b1c-40d5-898a-787d1d1bcf8e' }
+		'BSLETN' 	{ $DocumentGuid = 'b5ee18dc-c639-4fd2-9667-e7a1638bbf4e' }
+		'NDRCR2' 	{ $DocumentGuid = '7d5c7c50-bcfd-4699-9022-5bc3b48f612f' }
+		'NDRPBC' 	{ $DocumentGuid = 'd572dd21-1af5-422c-895e-8564ab6812dd' }
+		'NNENQ' 	{ $DocumentGuid = '6221498b-0d43-4d55-83fa-df6925ef0dae' }
+		'NDRPC' 	{ $DocumentGuid = '7e84150b-148c-4645-8a91-b04bc584b191' }
+		'NOPYMT' 	{ $DocumentGuid = 'fb5cb487-72de-45f5-a5ce-39a370405b1c' }
+		'RCOMMC' 	{ $DocumentGuid = '5d37fde3-2a5e-451d-a5a7-e2d6d85dd7ff' }
+		'RNFMEF' 	{ $DocumentGuid = 'cece8b10-3c29-427a-8671-478069bbd684' }
+		'NDRATC' 	{ $DocumentGuid = 'fd7a6de4-d497-4a47-8104-4bc50dcf8ede' }
+		'NR16' 		{ $DocumentGuid = '474ab1fe-fb04-4a2d-8253-eaf5c50a97c4' }
+		'NDRBS1' 	{ $DocumentGuid = '3ccc54b7-23b4-4b30-95a8-b081a146588e' }
+		'RNCM12' 	{ $DocumentGuid = '2718bbcd-33a6-490d-a4a7-041bd71b9274' }
+		'R7' 		{ $DocumentGuid = '83622c53-f8ac-4463-990e-e96934cb2f9d' }
+		'RNFA24' 	{ $DocumentGuid = 'e3cf6a4e-1168-418d-b855-0303507366ee' }
+		'NFME2' 	{ $DocumentGuid = 'db592c64-9579-4b00-96d7-3a884d369cc1' }
+		'SHEWC' 	{ $DocumentGuid = '5210b04e-944f-454a-93aa-41842d365fbc' }
+		'RNOL25' 	{ $DocumentGuid = 'b427278c-9432-4a10-8da3-560d455f6b72' }
+		'NDRRFI' 	{ $DocumentGuid = '24388753-98b8-486a-9d61-0c390845c803' }
+		'NDS44A' 	{ $DocumentGuid = 'c0ca1a08-3607-4f5a-b70e-87b76ccaa007' }
+		'NDS44C' 	{ $DocumentGuid = 'ef843974-3186-4200-a429-9e990353bead' }
+		'NSS4A' 	{ $DocumentGuid = 'fc9bb981-0dc3-4238-8a2a-11c2c00933cb' }
+		'NDRRR' 	{ $DocumentGuid = '1e3c7eed-698a-4392-b0c9-9e895d8391d5' }
+		'SMBUSL' 	{ $DocumentGuid = '15df37fa-ac61-4017-b9a6-fabdd012e13b' }
+		'NTAXC' 	{ $DocumentGuid = 'dc3d5ebf-10ab-414a-bf82-c298914bd69f' }
+		'NDVOC' 	{ $DocumentGuid = 'fb169897-386b-49df-8ae1-4304d43bbc2b' }
+		'VNNVD' 	{ $DocumentGuid = '58241328-6ddb-4175-8385-887b81ca94bd' }
+		'NRETAI' 	{ $DocumentGuid = '1c551532-6f02-4b53-93ff-a613848b3551' }
 	}
-	
+
 	# The title - add document label as we're losing lots of historic ones.
 	$Title = $Path.Substring($Path.LastIndexOf("\") + 1) + " (Migration: " + $Documentlabel + ")"
 
 	# Call the upload function
 	if ($DocumentGuid -ne '') {
-		Write-Output $DocumentLabel
-		UploadFile "http://Spaniel/" "DropOffLibrary" $Path $ContentType $DocumentGuid $Reference $CreatedDate $Title
+		Write-Output ($Documentlabel.ToString())
+		#UploadFile "http://Spaniel/" "DropOffLibrary" $Path $ContentType $DocumentGuid $Reference $CreatedDate $Title
 	}
 }
