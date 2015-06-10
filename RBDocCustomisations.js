@@ -324,7 +324,7 @@ function ApplyMultiItemWorkflow(wfName, wfType) {
             }
         }
 
-        if (wfType == 'Transfer' || wfType == 'CarbonCopy') {
+        if (wfType == 'Transfer') {
             // May as well do this early as the transferField is used in the different workflows.
             if (window.location.href.toLowerCase().search("rbdoc/revenues") !== -1) {
                 transferField = "Account_x0020_Reference";
