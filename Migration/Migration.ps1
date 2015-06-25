@@ -1,52 +1,63 @@
 ﻿Add-PSSnapin Microsoft.SharePoint.PowerShell -ErrorAction SilentlyContinue
 
+# Get the SharePoint Web & Lists to upload the file
+$Web = Get-SPWeb $WebURL
+$Site = Get-SPSite $WebURL
+$List = $Web.GetFolder($DocLibName)
+# Get the Files collection from SharePoint Document Library
+$Files = $List.Files
+
 # Function to Upload File
 function UploadFile($WebURL, $DocLibName, $FilePath, $ContentType, $DocumentGuid, $Reference, $CreatedDate, $Title)
 {
-	# Get the SharePoint Web & Lists to upload the file
-	$Web = Get-SPWeb $WebURL
-	$Site = Get-SPSite $WebURL
-	$List = $Web.GetFolder($DocLibName)
-
-	# Get the Files collection from SharePoint Document Library
-	$Files = $List.Files
-
 	# Get File Name from Path
 	$FileName = $FilePath.Substring($FilePath.LastIndexOf("\") + 1)
 
 	# Get the File from Disk
 	$File = Get-ChildItem $FilePath
 
-	$Metadata = @{}
+	$Metadata = @{
+		"Content Type" = $ContentType;
+		"Created" = $CreatedDate;
+		"Title" = $Title
+	}
 
-	# Add File to Files collection of Document Library
-	$UploadedFile = $Files.Add($DocLibName + "/" + $FileName, $File.OpenRead(), $Metadata,  $true) #true for overwrite file, if already exists!
-
-	$UploadedFile.Item["Content Type"] = $ContentType
-	$UploadedFile.Item["Created"] = $CreatedDate
+	# $UploadedFile.Item["Content Type"] = $ContentType
+	# $UploadedFile.Item["Created"] = $CreatedDate
 
 	# Benefits documents
 	if ($ContentType -like '*Benefits*') { 
-		$UploadedFile.Item["Document Label (Bens)"] = $DocumentGuid
-		$UploadedFile.Item["Claim Reference"] = $Reference
+		#$UploadedFile.Item["Document Label (Bens)"] = $DocumentGuid
+		#$UploadedFile.Item["Claim Reference"] = $Reference
+		$Metadata.Add("Document Label (Bens)", $DocumentGuid)
+		$Metadata.Add("Claim Reference", $Reference)
 	}
 	if ($ContentType -like '*Appeal*') { 
-		$UploadedFile.Item["Document Label (Bens)"] = $DocumentGuid
-		$UploadedFile.Item["Claim Reference"] = $Reference
+		#$UploadedFile.Item["Document Label (Bens)"] = $DocumentGuid
+		#$UploadedFile.Item["Claim Reference"] = $Reference
+		$Metadata.Add("Document Label (Bens)", $DocumentGuid)
+		$Metadata.Add("Claim Reference", $Reference)
 	}
 	# Revenues documents
 	if ($ContentType -like '*Revenues*') { 
-		$UploadedFile.Item["Document Label (Revs)"] = $DocumentGuid
-		$UploadedFile.Item["Reference"] = $Reference		
+		#$UploadedFile.Item["Document Label (Revs)"] = $DocumentGuid
+		#$UploadedFile.Item["Reference"] = $Reference
+		$Metadata.Add("Document Label (Revs)", $DocumentGuid)
+		$Metadata.Add("Reference", $Reference)		
 	}
 	# NNDR documents
 	if ($ContentType -like '*NNDR*') { 
-		$UploadedFile.Item["Document Label (NNDR)"] = $DocumentGuid
-		$UploadedFile.Item["NNDR Reference"] = $Reference
+		#$UploadedFile.Item["Document Label (NNDR)"] = $DocumentGuid
+		#$UploadedFile.Item["NNDR Reference"] = $Reference
+		$Metadata.Add("Document Label (NNDR)", $DocumentGuid)
+		$Metadata.Add("NNDR Reference", $Reference)
 	}
+	
+	# Add File to Files collection of Document Library
+	$UploadedFile = $Files.Add($DocLibName + "/" + $FileName, $File.OpenRead(), $Metadata,  $true) #true for overwrite file, if already exists!
 
 	# Title is common to all types.  There is no default title for the migration so we use the file name.
-	$UploadedFile.Item["Title"] = $Title
+	# $UploadedFile.Item["Title"] = $Title
 	$UploadedFile.Item.Update()
 }
 
